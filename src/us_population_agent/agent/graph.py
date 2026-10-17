@@ -1,7 +1,15 @@
+from typing import Literal
+
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import SystemMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import END, START, MessagesState, StateGraph
+from langgraph.graph import END, START, StateGraph
+
+from us_population_agent.agent.nodes.clarify import build_clarify
+from us_population_agent.agent.nodes.intent import build_run_intent
+from us_population_agent.agent.nodes.meta import build_meta
+from us_population_agent.agent.nodes.off_topic import build_off_topic
+from us_population_agent.agent.state import AgentState
 
 SYSTEM_PROMPT = (
     "You are an assistant that answers questions about the US population. "
@@ -9,15 +17,37 @@ SYSTEM_PROMPT = (
 )
 
 
-def build_graph(llm: BaseChatModel, checkpointer: BaseCheckpointSaver):
+Route = Literal["clarify", "meta", "off_topic", "chat"]
+
+INTENT_ROUTES: dict[str, Route] = {
+    "needs_clarification": "clarify",
+    "meta": "meta",
+    "off_topic": "off_topic",
+}
+
+
+def route_after_intent(state: AgentState) -> Route:
+    """Pick the next node from the classified intent. `answerable` (and anything unknown) goes to `chat`."""
+    return INTENT_ROUTES.get(state.get("intent") or "", "chat")
+
+
+def build_graph(llm: BaseChatModel, intent_llm: BaseChatModel, checkpointer: BaseCheckpointSaver):
     """Build the chat graph. Conversation history is stored per `thread_id` by the checkpointer."""
 
-    def call_model(state: MessagesState) -> dict:
+    def call_model(state: AgentState) -> dict:
         response = llm.invoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])
         return {"messages": response}
 
-    builder = StateGraph(MessagesState)  # ty: ignore[invalid-argument-type]  # ty does not recognise MessagesState as TypedDict
+    builder = StateGraph(AgentState)  # ty: ignore[invalid-argument-type]  # ty rejects TypedDict states in StateGraph
+    builder.add_node("intent", build_run_intent(intent_llm))
+    builder.add_node("clarify", build_clarify(llm))
+    builder.add_node("meta", build_meta(llm))
+    builder.add_node("off_topic", build_off_topic(llm))
     builder.add_node("chat", call_model)
-    builder.add_edge(START, "chat")
+    builder.add_edge(START, "intent")
+    builder.add_conditional_edges("intent", route_after_intent)
+    builder.add_edge("clarify", END)
+    builder.add_edge("meta", END)
+    builder.add_edge("off_topic", END)
     builder.add_edge("chat", END)
     return builder.compile(checkpointer=checkpointer)

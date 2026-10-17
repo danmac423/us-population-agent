@@ -10,7 +10,7 @@ from us_population_agent.agent.graph import build_graph
 from us_population_agent.config import get_settings
 from us_population_agent.llm.factory import LLMInitError, build_llm
 from us_population_agent.logging_config import setup_logging
-from us_population_agent.persistance.checkpointer import open_checkpointer
+from us_population_agent.persistence.checkpointer import open_checkpointer
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ def main() -> None:
 
     try:
         llm = build_llm(effort="low")
+        intent_llm = build_llm(effort="low")  # a smaller model can be used here later
     except LLMInitError as exc:
         logger.error("Startup error: %s", exc)
         raise SystemExit(1) from exc
@@ -39,7 +40,7 @@ def main() -> None:
 
     try:
         with open_checkpointer(settings.database_url) as checkpointer:
-            graph = build_graph(llm, checkpointer)
+            graph = build_graph(llm, intent_llm, checkpointer)
             run_chat(graph, args.thread)
     except psycopg.OperationalError as exc:
         logger.error("Database error, check DATABASE_URL and that the database is running: %s", exc)
