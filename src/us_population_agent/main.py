@@ -11,6 +11,7 @@ from us_population_agent.config import get_settings
 from us_population_agent.llm.factory import LLMInitError, build_llm
 from us_population_agent.logging_config import setup_logging
 from us_population_agent.persistence.checkpointer import open_checkpointer
+from us_population_agent.snowflake_client.columns import ColumnCatalog
 from us_population_agent.snowflake_client.connection import SnowflakeInitError, open_connection
 from us_population_agent.snowflake_client.search import CatalogSearch
 
@@ -43,7 +44,8 @@ def main() -> None:
     try:
         with open_connection(settings) as connection, open_checkpointer(settings.database_url) as checkpointer:
             catalog = CatalogSearch(connection, settings)
-            graph = build_graph(llm, intent_llm, catalog, checkpointer)
+            columns = ColumnCatalog(connection, settings)
+            graph = build_graph(llm, intent_llm, catalog, columns, checkpointer)
             run_chat(graph, args.thread)
     except SnowflakeInitError as exc:
         logger.error("Startup error: %s", exc)

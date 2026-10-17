@@ -27,3 +27,6 @@ class AgentState(TypedDict):
     # select_tables node
     selected_table_id: str | None
     selection_reason: str | None
+    # load_columns node
+    data_table_name: str | None
+    table_columns: list[dict] | None

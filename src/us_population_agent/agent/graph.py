@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 
 from us_population_agent.agent.nodes.clarify import build_clarify
 from us_population_agent.agent.nodes.intent import build_run_intent
+from us_population_agent.agent.nodes.load_columns import ColumnSource, build_load_columns
 from us_population_agent.agent.nodes.meta import build_meta
 from us_population_agent.agent.nodes.off_topic import build_off_topic
 from us_population_agent.agent.nodes.rewrite import build_rewrite
@@ -36,7 +37,11 @@ def route_after_intent(state: AgentState) -> Route:
 
 
 def build_graph(
-    llm: BaseChatModel, intent_llm: BaseChatModel, catalog: TableSearcher, checkpointer: BaseCheckpointSaver
+    llm: BaseChatModel,
+    intent_llm: BaseChatModel,
+    catalog: TableSearcher,
+    columns: ColumnSource,
+    checkpointer: BaseCheckpointSaver,
 ):
     """Build the chat graph. Conversation history is stored per `thread_id` by the checkpointer."""
 
@@ -49,6 +54,7 @@ def build_graph(
     builder.add_node("rewrite", build_rewrite(intent_llm))
     builder.add_node("search", build_search(catalog))
     builder.add_node("select_tables", build_select_tables(llm))
+    builder.add_node("load_columns", build_load_columns(columns))
     builder.add_node("clarify", build_clarify(llm))
     builder.add_node("meta", build_meta(llm))
     builder.add_node("off_topic", build_off_topic(llm))
@@ -57,7 +63,8 @@ def build_graph(
     builder.add_conditional_edges("intent", route_after_intent)
     builder.add_edge("rewrite", "search")
     builder.add_edge("search", "select_tables")
-    builder.add_edge("select_tables", "chat")  # temporary: columns and SQL come next
+    builder.add_edge("select_tables", "load_columns")
+    builder.add_edge("load_columns", "chat")  # temporary: column selection and SQL come next
     builder.add_edge("clarify", END)
     builder.add_edge("meta", END)
     builder.add_edge("off_topic", END)
