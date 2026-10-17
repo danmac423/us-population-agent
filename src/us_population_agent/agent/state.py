@@ -24,3 +24,6 @@ class AgentState(TypedDict):
     # search node
     candidates: list[dict] | None
     search_failed: bool | None
+    # select_tables node
+    selected_table_id: str | None
+    selection_reason: str | None

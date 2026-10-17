@@ -11,6 +11,7 @@ from us_population_agent.agent.nodes.meta import build_meta
 from us_population_agent.agent.nodes.off_topic import build_off_topic
 from us_population_agent.agent.nodes.rewrite import build_rewrite
 from us_population_agent.agent.nodes.search import TableSearcher, build_search
+from us_population_agent.agent.nodes.select_tables import build_select_tables
 from us_population_agent.agent.state import AgentState
 
 SYSTEM_PROMPT = (
@@ -47,6 +48,7 @@ def build_graph(
     builder.add_node("intent", build_run_intent(intent_llm))
     builder.add_node("rewrite", build_rewrite(intent_llm))
     builder.add_node("search", build_search(catalog))
+    builder.add_node("select_tables", build_select_tables(llm))
     builder.add_node("clarify", build_clarify(llm))
     builder.add_node("meta", build_meta(llm))
     builder.add_node("off_topic", build_off_topic(llm))
@@ -54,7 +56,8 @@ def build_graph(
     builder.add_edge(START, "intent")
     builder.add_conditional_edges("intent", route_after_intent)
     builder.add_edge("rewrite", "search")
-    builder.add_edge("search", "chat")  # temporary: table selection comes next
+    builder.add_edge("search", "select_tables")
+    builder.add_edge("select_tables", "chat")  # temporary: columns and SQL come next
     builder.add_edge("clarify", END)
     builder.add_edge("meta", END)
     builder.add_edge("off_topic", END)

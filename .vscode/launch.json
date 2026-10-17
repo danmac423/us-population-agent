@@ -6,7 +6,7 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/.venv/bin/us_population_agent",
-      "args": ["--thread", "debug1"],
+      "args": ["--thread", "debug2"],
       "console": "integratedTerminal",
       "envFile": "${workspaceFolder}/.env",
       "justMyCode": false

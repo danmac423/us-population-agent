@@ -21,3 +21,13 @@ class QueryRewrite(BaseModel):
     queries: list[str] = Field(
         description="Short catalog search queries (3-8 words each, at most 4), one per distinct topic."
     )
+
+
+class TableSelection(BaseModel):
+    """Output of the table selector: the candidate table that best answers the question."""
+
+    # `reason` comes first so the model compares the candidates before committing to one.
+    reason: str = Field(description="One or two sentences: why this table fits, or why none of the candidates does.")
+    table_id: str | None = Field(
+        description="TABLE_ID of the chosen candidate, or null when no candidate can answer the question."
+    )
