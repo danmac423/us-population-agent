@@ -10,10 +10,14 @@ class AgentState(TypedDict):
     """Graph state, persisted per thread by the checkpointer.
 
     Keep it to raw data that later nodes need. Prompts, formatted context and clients stay local to the nodes.
-    `intent` and `intent_reason` are overwritten by the classifier at the start of every turn. They are kept as
+    The remaining fields are per-turn results, overwritten by their node on every question. They are kept as
     plain values because custom types in checkpoints are going to be blocked by LangGraph.
     """
 
     messages: Annotated[list[AnyMessage], add_messages]
+    # intent node
     intent: Intent | None
     intent_reason: str | None
+    # rewrite node
+    queries: list[str] | None
+    rewrite_notes: str | None
