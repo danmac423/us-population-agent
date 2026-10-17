@@ -36,5 +36,5 @@ class AgentState(TypedDict):
     sql_notes: str | None
     sql_columns: list[dict] | None
     # execute_sql node
-    sql_result: dict | None  # columns, rows, truncated
+    sql_result: dict | None  # columns, rows
     sql_error: str | None

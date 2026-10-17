@@ -27,9 +27,9 @@ def build_execute_sql(runner: SqlExecutor):
             logger.warning("Query failed: %s", exc)
             return {"sql_result": None, "sql_error": str(exc)}
 
-        logger.info("Query returned %d rows (truncated: %s)", len(result.rows), result.truncated)
+        logger.info("Query returned %d rows", len(result.rows))
         return {
-            "sql_result": {"columns": result.columns, "rows": result.rows, "truncated": result.truncated},
+            "sql_result": {"columns": result.columns, "rows": result.rows},
             "sql_error": None,
         }
 

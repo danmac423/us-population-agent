@@ -27,9 +27,11 @@ estimates) data. You get the question, the query result and notes about how it w
 - Mention the assumptions and approximations from the notes when they affect how the number should be read
   (for example "median is approximated from block-group medians", "Baldwin County exists in AL and GA").
 - N_CBG is the number of census block groups behind a row. Do not mention it unless it is 0 or looks wrong.
+- If the notes say that part of the question is not covered or that an assumption was made (another year, a
+  county instead of a city, one reading of an ambiguous question), say so clearly next to the number and offer
+  to answer the missing part differently.
 - If the result has no rows or the query failed, say plainly that no data was found. Do not guess a value.
   Use the notes to explain what is missing and suggest a way to rephrase.
-- If the result was truncated, say that only the first rows are shown.
 - Do not show SQL or column names unless the user asks for them.
 - The data covers the US states, DC and Puerto Rico, at block-group level aggregated to county, state or country.
   Say so when the user asks about something outside the data."""
@@ -38,8 +40,7 @@ estimates) data. You get the question, the query result and notes about how it w
 def format_result(result: dict) -> str:
     header = " | ".join(result["columns"])
     rows = "\n".join(" | ".join(str(value) for value in row) for row in result["rows"])
-    truncated = "\n(truncated: more rows exist)" if result.get("truncated") else ""
-    return f"{header}\n{rows}{truncated}" if rows else f"{header}\n(no rows)"
+    return f"{header}\n{rows}" if rows else f"{header}\n(no rows)"
 
 
 def build_answer(llm: BaseChatModel):
@@ -49,8 +50,6 @@ def build_answer(llm: BaseChatModel):
         *history, latest = state["messages"]
         result = state.get("sql_result")
         error = state.get("sql_error")
-        columns = state.get("sql_columns") or []
-        meanings = {column["name"]: column["meaning"] for column in state.get("table_columns") or []}
 
         if result is not None:
             outcome = f"Query result:\n{format_result(result)}"
@@ -59,13 +58,9 @@ def build_answer(llm: BaseChatModel):
         else:
             outcome = "No query was run."
 
-        used = "\n".join(f"{c['column_name']} ({c['role']}): {meanings.get(c['column_name'], '')}" for c in columns)
         prompt = (
             f"Conversation so far:\n{format_context(history)}\n\n"
             f"Question: {latest.text}\n\n"
-            f"Table: {state.get('table_prefix') or 'unknown'}\n"
-            f"Columns used:\n{used or 'none'}\n\n"
-            f"SQL:\n{state.get('sql') or 'none'}\n\n"
             f"Notes: {state.get('sql_notes') or 'none'}\n\n"
             f"{outcome}"
         )

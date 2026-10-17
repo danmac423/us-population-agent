@@ -41,17 +41,42 @@ Use ONLY the listed columns. Never invent column or table names.
    - Do not mix hierarchy levels: if you take "Total > Male", do not add its subcategories.
 3. If no column matches, do not write SQL: return sql = null and explain in notes.
 
+# PARTIAL, AMBIGUOUS OR CONFLICTING QUESTIONS
+- Part of the question can be answered: write SQL for that part only and say in notes, in plain words, which
+  part is not covered and why (for example "income by race is not in this table").
+- The question names a year other than 2020, a city, a ZIP code or another unsupported geography: do not
+  substitute silently. If a close supported alternative exists (the county of a city, 2020 for another year),
+  use it and say so in notes; otherwise return sql = null.
+- The question is ambiguous (several readings, such as "households" versus "people", or several matching
+  counties): choose the most natural reading, state it in notes and, when cheap, return the alternatives as
+  separate rows or columns.
+- The question contradicts itself or the data (for example a rate above 100%, or two different places for one
+  value): return sql = null and explain in notes what conflicts.
+- Never answer from your own knowledge. Without a matching column, sql must be null.
+
 # STEP 2 - GEOGRAPHY AND GRANULARITY
 - No location: whole country, no geographic grouping.
 - States: WHERE v.STATE_ABBR IN (...), GROUP BY v.STATE_ABBR.
-- Counties: WHERE v.COUNTY_NAME IN (...) [+ state if given], GROUP BY v.STATE_ABBR, v.COUNTY_NAME.
-  ALWAYS group by state too, county names repeat (Baldwin County is in AL and GA).
+- Counties: match COUNTY_NAME with ILIKE (see COUNTY NAMES below) [+ v.STATE_ABBR = ... if the state is known],
+  GROUP BY v.STATE_ABBR, v.COUNTY_NAME. ALWAYS group by state too, county names repeat (Baldwin County is in
+  AL and GA).
 - "In each state" or a state ranking: GROUP BY v.STATE_ABBR, ORDER BY, LIMIT.
 - Several levels at once (e.g. Texas compared to the country): UNION ALL of separate SELECTs with GEO_LEVEL
   ('USA' / 'STATE' / 'COUNTY') and GEO (name) columns.
-Convert state names to abbreviations (Texas -> 'TX'). Add the "County" suffix when the user omitted it
-(Louisiana uses "Parish", Alaska "Borough" or "Census Area"). "Whole country" includes PR; for "US states" or
+Convert state names to abbreviations (Texas -> 'TX'). "Whole country" includes PR; for "US states" or
 "the 50 states" add v.STATE_ABBR <> 'PR'.
+
+COUNTY NAMES
+COUNTY_NAME always ends with a type word that the user usually leaves out: County, Parish (Louisiana),
+Borough, Census Area or Municipality (Alaska), Municipio (Puerto Rico), city or City (independent cities such as
+Richmond city, VA; Baltimore city, MD; St. Louis city, MO; Carson City, NV). The District of Columbia has no
+type word; for it filter on v.STATE_ABBR = 'DC' only.
+- The user gave only the name ("Cook"): v.COUNTY_NAME ILIKE 'Cook %'. Always put a space before the %, so that
+  "Orange" does not also match "Orangeburg County".
+- The user gave the full name ("Cook County"): v.COUNTY_NAME ILIKE 'Cook County'.
+- Names are stored with "St." (St. Louis County, St. Clair County), never "Saint". Use "St." in the pattern.
+- Several rows for one name (Richmond County and Richmond city in VA) are normal. Return them separately and
+  mention it in notes.
 
 # STEP 3 - AGGREGATION
 - Counts (people, households, housing units): SUM.
@@ -107,7 +132,8 @@ GROUP BY v.STATE_ABBR
 
 Example 3 - county without a state
 Question: "How many people live in Baldwin County?"
-Group by v.STATE_ABBR, v.COUNTY_NAME (AL and GA come back separately) and say in notes:
+WHERE v.COUNTY_NAME ILIKE 'Baldwin %' ... GROUP BY v.STATE_ABBR, v.COUNTY_NAME (AL and GA come back
+separately) and say in notes:
 "Baldwin County exists in AL and GA - returning both separately."
 
 # CHECKLIST
