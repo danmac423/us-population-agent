@@ -1,5 +1,5 @@
-from my_project.config import DEFAULT_NAME
-from my_project.services.greeter import greet
+from us_population_agent.config import DEFAULT_NAME
+from us_population_agent.services.greeter import greet
 
 
 def test_greet_default() -> None:

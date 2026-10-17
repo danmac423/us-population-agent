@@ -1,5 +1,5 @@
 [project]
-name = "my_project"
+name = "us_population_agent"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = []
 
 [project.scripts]
-my_project = "my_project.main:main"
+us_population_agent = "us_population_agent.main:main"
 
 [build-system]
 requires = ["hatchling"]
