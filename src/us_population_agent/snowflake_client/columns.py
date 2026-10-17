@@ -10,18 +10,35 @@ class ColumnCatalogError(Exception):
     """Raised when the columns of a table cannot be read."""
 
 
+MEANING_MARKER = " | Meaning: "
+
+
 @dataclass(frozen=True)
-class TableColumn:
-    """One column of a census data table with its human-readable meaning."""
+class Column:
+    """One column of a census data table."""
 
-    column_name: str
-    data_table_name: str
-    meaning: str
+    name: str  # e.g. B01001e3
+    meaning: str  # the part of the description specific to this column
 
 
-def parse_meaning(description: str) -> str:
-    """Keep only the `Meaning:` part of the description (the rest repeats table-level info for every column)."""
-    return description.split("Meaning:", 1)[-1].strip()
+@dataclass(frozen=True)
+class TableColumns:
+    """The columns of one census table, with the description part they all share."""
+
+    data_table_name: str  # e.g. 2020_CBG_B01
+    prefix: str  # table, topic, title and universe
+    columns: list[Column]
+
+
+def split_description(description: str) -> tuple[str, str]:
+    """Split `Column: X | <prefix> | Meaning: <meaning>` into (prefix, meaning).
+
+    A description in another format is returned whole as the meaning, so nothing is lost.
+    """
+    head, marker, meaning = description.partition(MEANING_MARKER)
+    if not marker:
+        return "", description
+    return head.partition(" | ")[2], meaning
 
 
 class ColumnCatalog:
@@ -35,8 +52,11 @@ class ColumnCatalog:
             "WHERE TABLE_ID = %s ORDER BY LENGTH(COLUMN_NAME), COLUMN_NAME"
         )
 
-    def columns_for(self, table_id: str) -> list[TableColumn]:
-        """Return the columns of one table (e.g. `B01001`) in numeric order. Raises `ColumnCatalogError`."""
+    def columns_for(self, table_id: str) -> TableColumns | None:
+        """Return the columns of one table (e.g. `B01001`) in numeric order, or None if it has none.
+
+        Raises `ColumnCatalogError`.
+        """
         try:
             with self._connection.cursor() as cursor:
                 cursor.execute(self._query, (table_id,))
@@ -44,7 +64,12 @@ class ColumnCatalog:
         except snowflake.connector.Error as exc:
             raise ColumnCatalogError(f"Reading columns of {table_id} failed: {exc}") from exc
 
-        return [
-            TableColumn(column_name=str(name), data_table_name=str(data_table), meaning=parse_meaning(str(description)))
-            for name, data_table, description in rows
+        if not rows:
+            return None
+
+        # The prefix is the same in every row of a table, so the first row is enough.
+        prefix, _ = split_description(str(rows[0][2]))
+        columns = [
+            Column(name=str(name), meaning=split_description(str(description))[1]) for name, _, description in rows
         ]
+        return TableColumns(data_table_name=str(rows[0][1]), prefix=prefix, columns=columns)

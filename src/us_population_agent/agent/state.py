@@ -29,4 +29,12 @@ class AgentState(TypedDict):
     selection_reason: str | None
     # load_columns node
     data_table_name: str | None
+    table_prefix: str | None  # table, topic, title and universe shared by all columns
     table_columns: list[dict] | None
+    # generate_sql node
+    sql: str | None
+    sql_notes: str | None
+    sql_columns: list[dict] | None
+    # execute_sql node
+    sql_result: dict | None  # columns, rows, truncated
+    sql_error: str | None

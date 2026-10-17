@@ -13,6 +13,7 @@ from us_population_agent.logging_config import setup_logging
 from us_population_agent.persistence.checkpointer import open_checkpointer
 from us_population_agent.snowflake_client.columns import ColumnCatalog
 from us_population_agent.snowflake_client.connection import SnowflakeInitError, open_connection
+from us_population_agent.snowflake_client.query import QueryRunner
 from us_population_agent.snowflake_client.search import CatalogSearch
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ def main() -> None:
     try:
         llm = build_llm(effort="low")
         intent_llm = build_llm(effort="low")  # a smaller model can be used here later
+        sql_llm = build_llm(settings.anthropic_strong_model_name)
     except LLMInitError as exc:
         logger.error("Startup error: %s", exc)
         raise SystemExit(1) from exc
@@ -45,7 +47,8 @@ def main() -> None:
         with open_connection(settings) as connection, open_checkpointer(settings.database_url) as checkpointer:
             catalog = CatalogSearch(connection, settings)
             columns = ColumnCatalog(connection, settings)
-            graph = build_graph(llm, intent_llm, catalog, columns, checkpointer)
+            runner = QueryRunner(connection)
+            graph = build_graph(llm, intent_llm, catalog, columns, runner, sql_llm, settings, checkpointer)
             run_chat(graph, args.thread)
     except SnowflakeInitError as exc:
         logger.error("Startup error: %s", exc)

@@ -1,0 +1,85 @@
+import logging
+
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+from us_population_agent.agent.context import format_context
+from us_population_agent.agent.state import AgentState
+
+logger = logging.getLogger(__name__)
+
+FALLBACK_NO_DATA = (
+    "I couldn't find a way to answer that from the census data. "
+    "Could you rephrase the question or ask about a different measure or place?"
+)
+FALLBACK_ERROR = "Something went wrong while looking up the data. Please try again or rephrase the question."
+
+ANSWER_SYSTEM_PROMPT = """# ROLE
+You answer questions about the US population using the result of a SQL query on US Census (ACS 2020, 5-year
+estimates) data. You get the question, the query result and notes about how it was computed.
+
+# RULES
+- Use ONLY numbers that appear in the query result. Never invent, estimate or recalculate beyond simple
+  rounding or a comparison of the returned values.
+- Start with the direct answer, then add short context if it helps. Be concise: a few sentences, plain text.
+  For several rows (for example states or counties) use a short list.
+- Format large numbers with thousands separators and percentages with a % sign.
+- Mention the assumptions and approximations from the notes when they affect how the number should be read
+  (for example "median is approximated from block-group medians", "Baldwin County exists in AL and GA").
+- N_CBG is the number of census block groups behind a row. Do not mention it unless it is 0 or looks wrong.
+- If the result has no rows or the query failed, say plainly that no data was found. Do not guess a value.
+  Use the notes to explain what is missing and suggest a way to rephrase.
+- If the result was truncated, say that only the first rows are shown.
+- Do not show SQL or column names unless the user asks for them.
+- The data covers the US states, DC and Puerto Rico, at block-group level aggregated to county, state or country.
+  Say so when the user asks about something outside the data."""
+
+
+def format_result(result: dict) -> str:
+    header = " | ".join(result["columns"])
+    rows = "\n".join(" | ".join(str(value) for value in row) for row in result["rows"])
+    truncated = "\n(truncated: more rows exist)" if result.get("truncated") else ""
+    return f"{header}\n{rows}{truncated}" if rows else f"{header}\n(no rows)"
+
+
+def build_answer(llm: BaseChatModel):
+    """Create the node that turns the query result into the final answer for the user."""
+
+    def answer(state: AgentState) -> dict:
+        *history, latest = state["messages"]
+        result = state.get("sql_result")
+        error = state.get("sql_error")
+        columns = state.get("sql_columns") or []
+        meanings = {column["name"]: column["meaning"] for column in state.get("table_columns") or []}
+
+        if result is not None:
+            outcome = f"Query result:\n{format_result(result)}"
+        elif error:
+            outcome = f"The query failed: {error}"
+        else:
+            outcome = "No query was run."
+
+        used = "\n".join(f"{c['column_name']} ({c['role']}): {meanings.get(c['column_name'], '')}" for c in columns)
+        prompt = (
+            f"Conversation so far:\n{format_context(history)}\n\n"
+            f"Question: {latest.text}\n\n"
+            f"Table: {state.get('table_prefix') or 'unknown'}\n"
+            f"Columns used:\n{used or 'none'}\n\n"
+            f"SQL:\n{state.get('sql') or 'none'}\n\n"
+            f"Notes: {state.get('sql_notes') or 'none'}\n\n"
+            f"{outcome}"
+        )
+        try:
+            text = llm.invoke([SystemMessage(ANSWER_SYSTEM_PROMPT), HumanMessage(prompt)]).text.strip()
+        except Exception:
+            logger.exception("Generating the answer failed")
+            text = ""
+
+        if not text:
+            # The user must never get an empty answer; show the raw result when we have one.
+            text = f"Here is the result:\n{format_result(result)}" if result and result["rows"] else FALLBACK_NO_DATA
+            if error and not result:
+                text = FALLBACK_ERROR
+        return {"messages": [AIMessage(text)]}
+
+    return answer

@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     anthropic_api_key: SecretStr
+    # Light model for classification, rewriting and replies; the strong one is for writing SQL.
     anthropic_model_name: str
+    anthropic_strong_model_name: str = "claude-sonnet-5-5"
 
     database_url: str
 

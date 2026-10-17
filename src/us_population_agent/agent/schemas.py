@@ -31,3 +31,19 @@ class TableSelection(BaseModel):
     table_id: str | None = Field(
         description="TABLE_ID of the chosen candidate, or null when no candidate can answer the question."
     )
+
+
+class ColumnRole(BaseModel):
+    """A column used by the generated SQL."""
+
+    column_name: str = Field(description="Column name exactly as listed, e.g. B29003e2.")
+    role: str = Field(description="numerator, denominator, count, aggregate or other.")
+
+
+class SqlGeneration(BaseModel):
+    """Output of the SQL generator: the chosen columns and one SELECT query."""
+
+    # Columns come first so they are chosen before the SQL that uses them.
+    selected_columns: list[ColumnRole] = Field(description="Columns used in the query; empty when sql is null.")
+    sql: str | None = Field(description="One Snowflake SELECT query, or null when the data cannot answer.")
+    notes: str = Field(description="Assumptions, approximations, ambiguities, or why sql is null; empty if none.")
