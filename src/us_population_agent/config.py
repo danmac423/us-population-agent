@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr
     anthropic_model_name: str
 
+    database_url: str
+
     log_level: str = "WARNING"
 
 
