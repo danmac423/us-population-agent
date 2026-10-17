@@ -21,3 +21,6 @@ class AgentState(TypedDict):
     # rewrite node
     queries: list[str] | None
     rewrite_notes: str | None
+    # search node
+    candidates: list[dict] | None
+    search_failed: bool | None

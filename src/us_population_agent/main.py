@@ -11,6 +11,8 @@ from us_population_agent.config import get_settings
 from us_population_agent.llm.factory import LLMInitError, build_llm
 from us_population_agent.logging_config import setup_logging
 from us_population_agent.persistence.checkpointer import open_checkpointer
+from us_population_agent.snowflake_client.connection import SnowflakeInitError, open_connection
+from us_population_agent.snowflake_client.search import CatalogSearch
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +41,13 @@ def main() -> None:
     logger.info("LLM ready")
 
     try:
-        with open_checkpointer(settings.database_url) as checkpointer:
-            graph = build_graph(llm, intent_llm, checkpointer)
+        with open_connection(settings) as connection, open_checkpointer(settings.database_url) as checkpointer:
+            catalog = CatalogSearch(connection, settings)
+            graph = build_graph(llm, intent_llm, catalog, checkpointer)
             run_chat(graph, args.thread)
+    except SnowflakeInitError as exc:
+        logger.error("Startup error: %s", exc)
+        raise SystemExit(1) from exc
     except psycopg.OperationalError as exc:
         logger.error("Database error, check DATABASE_URL and that the database is running: %s", exc)
         raise SystemExit(1) from exc
