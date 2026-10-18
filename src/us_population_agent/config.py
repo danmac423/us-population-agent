@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     max_search_queries: int = Field(default=4, ge=1)  # catalog search queries per question
     max_candidates: int = Field(default=8, ge=1)  # candidate tables passed to the table selector
     search_limit: int = Field(default=5, ge=1)  # tables returned by one catalog search query
+    max_context_tokens: int = Field(default=2000, ge=1)  # conversation history passed to the model (estimated tokens)
 
     # Model calls: transient errors (network, 429, 5xx) are retried with exponential backoff.
     llm_max_retries: int = Field(default=4, ge=0)

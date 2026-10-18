@@ -11,6 +11,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
+from us_population_agent.agent import context as context_module
 from us_population_agent.agent import graph as graph_module
 from us_population_agent.agent.graph import build_graph
 from us_population_agent.agent.nodes.answer import FALLBACK_NO_DATA
@@ -129,6 +130,7 @@ class Scenario:
 @pytest.fixture(autouse=True)
 def settings(monkeypatch):
     monkeypatch.setattr(graph_module, "get_settings", lambda: SETTINGS)
+    monkeypatch.setattr(context_module, "get_settings", lambda: SETTINGS)
 
 
 def make_graph(scenario: Scenario):
