@@ -35,7 +35,6 @@ class AgentState(TypedDict):
     # generate_sql node
     sql: str | None
     sql_notes: str | None
-    sql_columns: list[dict] | None
     sql_unanswered: list[str] | None  # parts of the question the query does not cover
     sql_attempts: int | None  # how many times repair_sql has rewritten the query
     technical_failure: bool | None  # the model or Snowflake failed; says nothing about whether the data exists

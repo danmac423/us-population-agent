@@ -174,7 +174,7 @@ def build_prompt(state: AgentState) -> str:
 def run_generator(generator, system_prompt: str, prompt: str, columns: list[dict]) -> dict:
     """Call the structured-output model and turn its answer into state fields (sql, notes, columns)."""
     # A failed call says nothing about the data, so it is flagged as technical instead of explained as "no data".
-    failed = {"sql": None, "sql_notes": None, "sql_columns": [], "sql_unanswered": [], "technical_failure": True}
+    failed = {"sql": None, "sql_notes": None, "sql_unanswered": [], "technical_failure": True}
     try:
         result = generator.invoke([SystemMessage(system_prompt), HumanMessage(prompt)])
     except Exception:
@@ -185,16 +185,10 @@ def run_generator(generator, system_prompt: str, prompt: str, columns: list[dict
         logger.error("Unexpected generator output: %r", result)
         return failed
 
-    # The model may invent columns, so keep only those that really belong to the table.
-    known = {column["name"] for column in columns}
-    used = [column.model_dump() for column in result.selected_columns if column.column_name in known]
-    if len(used) != len(result.selected_columns):
-        logger.warning("Generator listed unknown columns: %r", result.selected_columns)
     logger.info("Generated SQL: %s (%s)", result.sql, result.notes)
     return {
         "sql": result.sql,
         "sql_notes": result.notes,
-        "sql_columns": used,
         "sql_unanswered": result.unanswered,
         "technical_failure": False,
     }
@@ -213,7 +207,6 @@ def build_generate_sql(llm: BaseChatModel, settings: Settings):
             return {
                 "sql": None,
                 "sql_notes": "No table columns to build a query from.",
-                "sql_columns": [],
                 "sql_unanswered": [],
                 "technical_failure": False,
                 **fresh,
