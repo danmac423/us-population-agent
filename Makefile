@@ -36,7 +36,7 @@ eval-judge:
 check: lint typecheck test
 
 api:
-	uv run uvicorn --factory us_population_agent.api:create_app --reload
+	uv run --env-file .env uvicorn --factory us_population_agent.api:create_app --reload
 
 frontend:
 	uv run --group frontend streamlit run frontend/app.py
