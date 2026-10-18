@@ -1,4 +1,4 @@
-.PHONY: install fmt lint typecheck test check run clean
+.PHONY: install fmt lint typecheck test test-unit test-integration check run clean
 
 install:
 	uv sync
@@ -17,6 +17,12 @@ typecheck:
 
 test:
 	uv run pytest --cov
+
+test-unit:
+	uv run pytest tests/unit
+
+test-integration:
+	uv run pytest tests/integration
 
 check: lint typecheck test
 

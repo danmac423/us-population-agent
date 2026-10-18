@@ -35,9 +35,13 @@ dev = [
 target-version = "py313"
 line-length = 120
 
+[tool.ty.src]
+exclude = ["tests/**"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = ["integration: runs the whole graph with mocked models and Snowflake"]
 
 [tool.coverage.run]
 source = ["src"]
