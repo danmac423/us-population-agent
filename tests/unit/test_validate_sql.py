@@ -12,7 +12,7 @@ GOOD = (
 
 
 def check(sql: str) -> list[str]:
-    return validate_sql(sql, settings=SETTINGS, data_table="2020_CBG_B01", columns=COLUMNS)  # ty: ignore[invalid-argument-type]
+    return validate_sql(sql, settings=SETTINGS, data_table="2020_CBG_B01", columns=COLUMNS)
 
 
 def test_valid_query_passes():
