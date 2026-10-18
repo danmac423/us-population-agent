@@ -303,7 +303,7 @@ Each decision lists what I chose, what I rejected, why, and what it costs. The c
 ### 4.2 Retrieval over table metadata (Cortex Search) instead of stuffing the schema into the prompt
 
 - **Decision:** search a catalog with **one entry per census table**, pick one table, then load **all** of its columns exactly (no search) and let the strong model choose among them.
-- **Alternatives:** put the whole schema in the prompt (about 3,800 columns in about 300 tables, far too large and noisy); search at column level (an earlier version of this project did this, see the git history of [`data_exploration.sql`](snowflake_sql/data_exploration.sql)); keyword search.
+- **Alternatives:** put the whole schema in the prompt (about 3,800 columns in about 300 tables, far too large and noisy); search at column level; keyword search.
 - **Why:** a single column means little without its siblings. "Male > Under 5 years" needs the table's total as a denominator, and "under 18" needs the sum of eight columns across two sexes. Searching for single columns returns fragments of a table. Searching tables, whose description lists the breakdowns (the age groups, the income brackets), finds the right table for "by age" or "by income" questions, and the full column list then gives the model everything it needs for sums and ratios.
 - **Trade-off:** retrieval is a hard gate. If the right table is not among the 8 candidates, the question cannot be answered, so recall depends on the quality of `rewrite` and of the catalog text. Using a single table also rules out answers that combine two tables.
 
