@@ -19,6 +19,7 @@ from us_population_agent.snowflake_client.search import CatalogSearch
 logger = logging.getLogger(__name__)
 
 EXIT_COMMANDS = {"exit", "quit"}
+TURN_FAILED = "Something went wrong while handling that. Please try again."
 
 
 def main() -> None:
@@ -71,5 +72,11 @@ def run_chat(graph, thread_id: str) -> None:
         if text.lower() in EXIT_COMMANDS:
             break
 
-        result = graph.invoke({"messages": [HumanMessage(text)]}, config)
+        try:
+            result = graph.invoke({"messages": [HumanMessage(text)]}, config)
+        except Exception:
+            # A failure inside one turn must not end the whole conversation.
+            logger.exception("The turn failed")
+            print(TURN_FAILED)
+            continue
         print(result["messages"][-1].content)

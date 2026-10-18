@@ -29,6 +29,10 @@ def build_execute_sql(runner: SqlExecutor):
         except QueryError as exc:
             logger.warning("Query failed: %s", exc)
             return {"sql_result": None, "sql_error": str(exc)}
+        except Exception as exc:
+            # Not a Snowflake rejection of the SQL, so rewriting the query would not help.
+            logger.exception("Unexpected error while running the query")
+            return {"sql_result": None, "sql_error": str(exc) or type(exc).__name__, "technical_failure": True}
 
         logger.info("Query returned %d rows", len(result.rows))
         return {

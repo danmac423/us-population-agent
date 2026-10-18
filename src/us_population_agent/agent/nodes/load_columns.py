@@ -27,6 +27,10 @@ def build_load_columns(columns: ColumnSource):
         except ColumnCatalogError:
             logger.exception("Loading columns of %s failed", table_id)
             return empty
+        except Exception:
+            # Anything the catalog did not wrap is still an infrastructure failure, not a reason to stop the chat.
+            logger.exception("Unexpected error while loading columns of %s", table_id)
+            return empty
 
         if found is None:
             logger.warning("Table %s has no columns in the metadata", table_id)
