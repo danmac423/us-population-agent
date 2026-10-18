@@ -9,8 +9,6 @@ from us_population_agent.config import Settings
 
 logger = logging.getLogger(__name__)
 
-LOGIN_TIMEOUT_SECONDS = 20
-
 
 class SnowflakeInitError(Exception):
     """Raised when the Snowflake connection cannot be opened."""
@@ -28,7 +26,7 @@ def open_connection(settings: Settings) -> Generator[SnowflakeConnection]:
             warehouse=settings.snowflake_warehouse,
             database=settings.snowflake_database,
             schema=settings.snowflake_schema,
-            login_timeout=LOGIN_TIMEOUT_SECONDS,
+            login_timeout=settings.login_timeout_seconds,
         )
     except snowflake.connector.Error as exc:
         logger.exception("Cannot connect to Snowflake")

@@ -9,8 +9,6 @@ from us_population_agent.agent.state import AgentState
 
 logger = logging.getLogger(__name__)
 
-MAX_QUERIES = 4
-
 REWRITE_SYSTEM_PROMPT = """# ROLE
 You rewrite the user's latest question into search queries for a catalog of US Census (ACS) tables.
 Use the conversation to resolve follow-ups ("and in Ohio?", "what about women?"). Do not answer the question.
@@ -44,7 +42,7 @@ official census wording.
 6. Keep race/ethnicity and sex if mentioned (for example "Hispanic or Latino", "female").
 7. Queries are short (3-8 words). Write ONE query per distinct topic the user asks about. For the most
    important topic you may add one alternative: the most general fitting table first, then a more specific one.
-   Use at most 4 queries in total.
+   Use at most {max_queries} queries in total.
 8. If the question is only about the places themselves (land area, water area, coordinates), return no queries
    and say so in notes: this is not in the ACS tables.
 
@@ -91,9 +89,10 @@ notes: Land area is geography metadata, not an ACS table.
 queries: (none)"""
 
 
-def build_rewrite(llm: BaseChatModel):
+def build_rewrite(llm: BaseChatModel, max_queries: int):
     """Create the rewrite node: turns the conversation and the latest question into catalog search queries."""
     rewriter = llm.with_structured_output(QueryRewrite)
+    system_prompt = REWRITE_SYSTEM_PROMPT.format(max_queries=max_queries)
 
     def rewrite(state: AgentState) -> dict:
         *history, latest = state["messages"]
@@ -105,7 +104,7 @@ def build_rewrite(llm: BaseChatModel):
 
         prompt = f"Conversation so far:\n{format_context(history)}\n\nQuestion: {latest.text}"
         try:
-            result = rewriter.invoke([SystemMessage(REWRITE_SYSTEM_PROMPT), HumanMessage(prompt)])
+            result = rewriter.invoke([SystemMessage(system_prompt), HumanMessage(prompt)])
         except Exception:
             logger.exception("Query rewriting failed")
             return fallback
@@ -114,7 +113,7 @@ def build_rewrite(llm: BaseChatModel):
             logger.error("Unexpected rewriter output: %r", result)
             return fallback
 
-        queries = [query.strip() for query in result.queries if query.strip()][:MAX_QUERIES]
+        queries = [query.strip() for query in result.queries if query.strip()][:max_queries]
         logger.info("Queries: %s (%s)", queries, result.notes)
         return {"queries": queries, "rewrite_notes": result.notes}
 

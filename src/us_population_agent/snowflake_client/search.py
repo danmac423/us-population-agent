@@ -51,6 +51,7 @@ class CatalogSearch:
     """Cortex Search over the catalog of ACS tables."""
 
     def __init__(self, connection: SnowflakeConnection, settings: Settings) -> None:
+        self._limit = settings.search_limit
         self._service = (
             Root(connection)
             .databases[settings.snowflake_database]
@@ -58,14 +59,14 @@ class CatalogSearch:
             .cortex_search_services[settings.snowflake_search_service]
         )
 
-    def search(self, query: str, limit: int = 5) -> list[TableHit]:
+    def search(self, query: str) -> list[TableHit]:
         """Return the best matching tables, best first. Rows with missing fields are skipped.
 
         Raises `CatalogSearchError` when the request fails. The SDK already validates that `results`
         is a list of dicts, so only the content of each row needs checking here.
         """
         try:
-            response = self._service.search(query=query, columns=SEARCH_COLUMNS, limit=limit)
+            response = self._service.search(query=query, columns=SEARCH_COLUMNS, limit=self._limit)
         except (SnowflakePythonError, snowflake.connector.Error) as exc:
             raise CatalogSearchError(f"Cortex Search request failed: {exc}") from exc
 

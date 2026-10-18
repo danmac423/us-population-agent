@@ -4,7 +4,7 @@ from decimal import Decimal
 import snowflake.connector
 from snowflake.connector import SnowflakeConnection
 
-TIMEOUT_SECONDS = 30
+from us_population_agent.config import Settings
 
 
 class QueryError(Exception):
@@ -33,14 +33,15 @@ def to_plain(value):
 class QueryRunner:
     """Runs generated SELECT queries on the census data (the connection's role is read-only)."""
 
-    def __init__(self, connection: SnowflakeConnection) -> None:
+    def __init__(self, connection: SnowflakeConnection, settings: Settings) -> None:
         self._connection = connection
+        self._timeout_seconds = settings.query_timeout_seconds
 
     def run(self, sql: str) -> QueryResult:
         """Execute the query and return all rows. Raises `QueryError`, or `QueryUnavailableError` for infrastructure errors."""
         try:
             with self._connection.cursor() as cursor:
-                cursor.execute(sql, timeout=TIMEOUT_SECONDS)
+                cursor.execute(sql, timeout=self._timeout_seconds)
                 rows = cursor.fetchall()
                 columns = [column.name for column in cursor.description or []]
         except snowflake.connector.ProgrammingError as exc:

@@ -1,7 +1,9 @@
 from typing import cast
 
+import pytest
+
+from us_population_agent.agent import graph
 from us_population_agent.agent.graph import (
-    MAX_REPAIRS,
     no_sql_hint,
     no_table_hint,
     route_after_execute_sql,
@@ -10,6 +12,15 @@ from us_population_agent.agent.graph import (
 )
 from us_population_agent.agent.nodes.answer import unanswered_parts
 from us_population_agent.agent.state import AgentState
+from us_population_agent.config import Settings
+
+MAX_REPAIRS = 2
+
+
+@pytest.fixture(autouse=True)
+def settings(monkeypatch):
+    """The routers read the repair limit from the settings; build them without the required .env values."""
+    monkeypatch.setattr(graph, "get_settings", lambda: Settings.model_construct(max_repairs=MAX_REPAIRS))
 
 
 def state(**fields) -> AgentState:

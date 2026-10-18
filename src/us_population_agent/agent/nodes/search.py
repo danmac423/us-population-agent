@@ -14,10 +14,7 @@ class TableSearcher(Protocol):
     def search(self, query: str) -> list[TableHit]: ...
 
 
-MAX_CANDIDATES = 8
-
-
-def merge_rankings(rankings: list[list[TableHit]], max_candidates: int = MAX_CANDIDATES) -> list[dict]:
+def merge_rankings(rankings: list[list[TableHit]], max_candidates: int) -> list[dict]:
     """Interleave the per-query rankings, drop duplicate tables and keep at most `max_candidates`.
 
     Rank 1 of every query comes first, then rank 2 and so on, so every topic of the question is represented
@@ -39,7 +36,7 @@ def merge_rankings(rankings: list[list[TableHit]], max_candidates: int = MAX_CAN
     return list(candidates.values())
 
 
-def build_search(catalog: TableSearcher):
+def build_search(catalog: TableSearcher, max_candidates: int):
     """Create the search node: runs every rewritten query one after another and merges the results.
 
     A failing query is skipped. `search_failed` is set only when every query failed, so later nodes
@@ -60,7 +57,7 @@ def build_search(catalog: TableSearcher):
                 failures += 1
                 logger.exception("Catalog search failed for %r", query)
 
-        candidates = merge_rankings(rankings)
+        candidates = merge_rankings(rankings, max_candidates)
         logger.info("Search: %d queries, %d failed, %d candidates", len(queries), failures, len(candidates))
         return {"candidates": candidates, "search_failed": failures == len(queries)}
 

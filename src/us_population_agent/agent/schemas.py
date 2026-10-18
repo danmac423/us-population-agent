@@ -18,9 +18,7 @@ class QueryRewrite(BaseModel):
 
     # `notes` comes first so assumptions are written before the queries that depend on them.
     notes: str = Field(description="Assumptions or caveats for the next step; empty string if none.")
-    queries: list[str] = Field(
-        description="Short catalog search queries (3-8 words each, at most 4), one per distinct topic."
-    )
+    queries: list[str] = Field(description="Short catalog search queries (3-8 words each), one per distinct topic.")
 
 
 class TableSelection(BaseModel):

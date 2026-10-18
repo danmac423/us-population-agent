@@ -19,9 +19,7 @@ from us_population_agent.agent.nodes.search import TableSearcher, build_search
 from us_population_agent.agent.nodes.select_tables import build_select_tables
 from us_population_agent.agent.nodes.validate_sql import build_validate_sql
 from us_population_agent.agent.state import AgentState
-from us_population_agent.config import Settings
-
-MAX_REPAIRS = 2  # how many times a failing query is rewritten before giving up
+from us_population_agent.config import Settings, get_settings
 
 Route = Literal["rewrite", "clarify", "meta", "off_topic"]
 
@@ -58,7 +56,7 @@ def route_after_generate_sql(state: AgentState) -> Literal["validate_sql", "unav
 
 
 def can_repair(state: AgentState) -> bool:
-    return (state.get("sql_attempts") or 0) < MAX_REPAIRS
+    return (state.get("sql_attempts") or 0) < get_settings().max_repairs
 
 
 def route_after_validate_sql(state: AgentState) -> Literal["execute_sql", "repair_sql", "failed_query"]:
@@ -100,8 +98,8 @@ def build_graph(
 
     builder = StateGraph(AgentState)  # ty: ignore[invalid-argument-type]  # ty rejects TypedDict states in StateGraph
     builder.add_node("intent", build_run_intent(intent_llm))
-    builder.add_node("rewrite", build_rewrite(intent_llm))
-    builder.add_node("search", build_search(catalog))
+    builder.add_node("rewrite", build_rewrite(intent_llm, settings.max_search_queries))
+    builder.add_node("search", build_search(catalog, settings.max_candidates))
     builder.add_node("select_tables", build_select_tables(llm))
     builder.add_node("load_columns", build_load_columns(columns))
     builder.add_node("generate_sql", build_generate_sql(sql_llm, settings))

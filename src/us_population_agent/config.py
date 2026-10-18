@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     snowflake_census_schema: str
 
     log_level: str = "WARNING"
+    default_thread_id: str = "demo"  # conversation used when --thread is not given
+
+    # Agent limits.
+    max_repairs: int = Field(default=2, ge=0)  # how many times a failing query is rewritten before giving up
+    max_search_queries: int = Field(default=4, ge=1)  # catalog search queries per question
+    max_candidates: int = Field(default=8, ge=1)  # candidate tables passed to the table selector
+    search_limit: int = Field(default=5, ge=1)  # tables returned by one catalog search query
+
+    # Snowflake timeouts.
+    query_timeout_seconds: int = Field(default=30, ge=1)
+    login_timeout_seconds: int = Field(default=20, ge=1)
 
     @property
     def census_schema(self) -> str:
