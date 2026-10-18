@@ -154,15 +154,38 @@ set sql to null and explain in notes what is missing."""
 
 
 def build_system_prompt(settings: Settings) -> str:
+    """Fills the Census schema and the geography table into the SQL generation prompt.
+
+    Args:
+        settings: Application settings providing the schema and table names.
+
+    Returns:
+        The system prompt for SQL generation and repair.
+    """
     return GENERATE_SQL_SYSTEM_PROMPT.format(census_schema=settings.census_schema, geography=settings.geography_table)
 
 
 def format_columns(columns: list[dict]) -> str:
+    """Formats table columns as `COLUMN_NAME | Meaning` lines for the prompt.
+
+    Args:
+        columns: Columns of the selected table, each with `name` and `meaning`.
+
+    Returns:
+        One line per column.
+    """
     return "\n".join(f"{column['name']} | {column['meaning']}" for column in columns)
 
 
 def build_prompt(state: AgentState) -> str:
-    """The user-side prompt shared by generation and repair: question, context and the table's columns."""
+    """Builds the user-side prompt shared by generation and repair.
+
+    Args:
+        state: Current graph state. Reads the messages, rewriter notes and the selected table with its columns.
+
+    Returns:
+        The question, conversation context, notes and the table's columns as one text.
+    """
     *history, latest = state["messages"]
     return (
         f"Conversation so far:\n{format_context(history)}\n\n"
@@ -175,8 +198,20 @@ def build_prompt(state: AgentState) -> str:
 
 
 def run_generator(generator, system_prompt: str, prompt: str, columns: list[dict]) -> dict:
-    """Call the structured-output model and turn its answer into state fields (sql, notes, columns)."""
-    # A failed call says nothing about the data, so it is flagged as technical instead of explained as "no data".
+    """Calls the structured-output model and turns its answer into state fields.
+
+    A failed call says nothing about the data, so it is flagged as a technical failure
+    instead of being explained as "no data".
+
+    Args:
+        generator: Chat model with structured output returning a `SqlGeneration`.
+        system_prompt: System prompt for the model.
+        prompt: User-side prompt.
+        columns: Columns of the selected table.
+
+    Returns:
+        A state update with `sql`, `sql_notes`, `sql_unanswered` and `technical_failure`.
+    """
     failed = {"sql": None, "sql_notes": None, "sql_unanswered": [], "technical_failure": True}
     try:
         result = generator.invoke([SystemMessage(system_prompt), HumanMessage(prompt)])
@@ -198,11 +233,30 @@ def run_generator(generator, system_prompt: str, prompt: str, columns: list[dict
 
 
 def build_generate_sql(llm: BaseChatModel, settings: Settings):
-    """Create the node that selects columns and writes the SQL for the chosen table."""
+    """Creates the node that selects columns and writes the SQL for the chosen table.
+
+    Args:
+        llm: Strong chat model that writes the SQL.
+        settings: Application settings used to fill in the system prompt.
+
+    Returns:
+        The `generate_sql` node function.
+    """
     generator = llm.with_structured_output(SqlGeneration, method="json_schema")
     system_prompt = build_system_prompt(settings)
 
     def generate_sql(state: AgentState) -> dict:
+        """Generates the SQL for the selected table and resets the validation and execution fields.
+
+        A new question starts with a clean slate for validation, execution and repair.
+
+        Args:
+            state: Current graph state.
+
+        Returns:
+            A state update with the generated `sql`, its notes and the reset repair fields. `sql` is None
+            if there are no columns to build a query from, or if the model could not produce a query.
+        """
         # A new question starts with a clean slate for validation, execution and repair.
         fresh = {"sql_attempts": 0, "sql_errors": None, "sql_error": None, "sql_result": None}
         columns = state.get("table_columns") or []

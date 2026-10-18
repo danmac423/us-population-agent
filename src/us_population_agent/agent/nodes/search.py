@@ -11,14 +11,29 @@ logger = logging.getLogger(__name__)
 class TableSearcher(Protocol):
     """What the search node needs from the catalog; `CatalogSearch` implements it."""
 
-    def search(self, query: str) -> list[TableHit]: ...
+    def search(self, query: str) -> list[TableHit]:
+        """Finds the census tables that best match a query.
+
+        Args:
+            query: Free-text search query.
+
+        Returns:
+            Matching tables, best first.
+        """
 
 
 def merge_rankings(rankings: list[list[TableHit]], max_candidates: int) -> list[dict]:
-    """Interleave the per-query rankings, drop duplicate tables and keep at most `max_candidates`.
+    """Interleaves the per-query rankings, drops duplicate tables and keeps at most `max_candidates`.
 
     Rank 1 of every query comes first, then rank 2 and so on, so every topic of the question is represented
     before the cap cuts the list. Reranker scores are only comparable within one query, so they are not used.
+
+    Args:
+        rankings: One ranked list of hits per search query.
+        max_candidates: Maximum number of candidates to return.
+
+    Returns:
+        Candidate tables as dicts with `table_id`, `data_table_name`, `title` and `search_text`.
     """
     candidates: dict[str, dict] = {}
     for hits_at_rank in zip_longest(*rankings):
@@ -37,13 +52,29 @@ def merge_rankings(rankings: list[list[TableHit]], max_candidates: int) -> list[
 
 
 def build_search(catalog: TableSearcher, max_candidates: int):
-    """Create the search node: runs every rewritten query one after another and merges the results.
+    """Creates the search node.
 
-    A failing query is skipped. `search_failed` is set only when every query failed, so later nodes
-    can tell "nothing found" from "the search is down".
+    The node runs every rewritten query one after another and merges the results. A failing query is
+    skipped. `search_failed` is set only when every query failed, so later nodes can tell "nothing found"
+    from "the search is down".
+
+    Args:
+        catalog: Search over the catalog of census tables.
+        max_candidates: Maximum number of candidate tables passed on.
+
+    Returns:
+        The `run_search` node function.
     """
 
     def run_search(state: AgentState) -> dict:
+        """Searches the catalog with each rewritten query and merges the results.
+
+        Args:
+            state: Current graph state. Reads `queries`.
+
+        Returns:
+            A state update with the merged `candidates` and `search_failed`.
+        """
         queries = state.get("queries") or []
         if not queries:
             return {"candidates": [], "search_failed": False}

@@ -34,7 +34,16 @@ Reply: I can only help with questions about US population data. Is there a state
 
 
 def build_off_topic(llm: BaseChatModel):
-    """Create the off_topic node: declines politely and explains what the assistant can do instead."""
+    """Creates the off_topic node.
+
+    The node declines politely and explains what the assistant can do instead.
+
+    Args:
+        llm: Chat model that writes the reply.
+
+    Returns:
+        The `off_topic` node function.
+    """
     return build_reply_node(
         llm,
         name="off_topic",

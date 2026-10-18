@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Application settings loaded from environment variables and the .env file."""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     anthropic_api_key: SecretStr
@@ -54,13 +56,25 @@ class Settings(BaseSettings):
 
     @property
     def census_schema(self) -> str:
+        """Fully qualified name of the Marketplace Census schema, as `database.schema`."""
         return f"{self.snowflake_census_database}.{self.snowflake_census_schema}"
 
     @property
     def geography_table(self) -> str:
+        """Fully qualified name of the geography table, as `database.schema.table`."""
         return f"{self.snowflake_database}.{self.snowflake_schema}.{self.snowflake_geography_table}"
 
 
 @lru_cache
 def get_settings() -> Settings:
+    """Returns the process-wide settings instance.
+
+    The result is cached, so the environment is read only once.
+
+    Returns:
+        The validated application settings.
+
+    Raises:
+        pydantic.ValidationError: If a required variable is missing or invalid.
+    """
     return Settings()

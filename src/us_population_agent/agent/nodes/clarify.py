@@ -31,7 +31,16 @@ Question: I can't look up cities directly. Would you like King County, WA or the
 
 
 def build_clarify(llm: BaseChatModel):
-    """Create the clarify node. It asks the user for the missing detail and adds the question to the history."""
+    """Creates the clarify node.
+
+    The node asks the user for the missing detail and adds the question to the history.
+
+    Args:
+        llm: Chat model that writes the clarifying question.
+
+    Returns:
+        The `clarify` node function.
+    """
     return build_reply_node(
         llm,
         name="clarify",

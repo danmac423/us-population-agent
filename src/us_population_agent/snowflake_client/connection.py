@@ -16,7 +16,17 @@ class SnowflakeInitError(Exception):
 
 @contextmanager
 def open_connection(settings: Settings) -> Generator[SnowflakeConnection]:
-    """Open a Snowflake connection that lives for the duration of the `with` block."""
+    """Opens a Snowflake connection that lives for the duration of the `with` block.
+
+    Args:
+        settings: Application settings with the Snowflake credentials, role, warehouse and login timeout.
+
+    Yields:
+        An open connection. It is closed when the context exits, also on error.
+
+    Raises:
+        SnowflakeInitError: If the connection cannot be established.
+    """
     try:
         connection = snowflake.connector.connect(
             account=settings.snowflake_account,
@@ -27,6 +37,7 @@ def open_connection(settings: Settings) -> Generator[SnowflakeConnection]:
             database=settings.snowflake_database,
             schema=settings.snowflake_schema,
             login_timeout=settings.login_timeout_seconds,
+            enable_server_session_keep_alive_auto_detection=False,
         )
     except snowflake.connector.Error as exc:
         logger.exception("Cannot connect to Snowflake")

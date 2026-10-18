@@ -90,11 +90,32 @@ queries: (none)"""
 
 
 def build_rewrite(llm: BaseChatModel, max_queries: int):
-    """Create the rewrite node: turns the conversation and the latest question into catalog search queries."""
+    """Creates the rewrite node.
+
+    The node turns the conversation and the latest question into catalog search queries.
+
+    Args:
+        llm: Chat model that rewrites the question.
+        max_queries: Maximum number of search queries to produce.
+
+    Returns:
+        The `rewrite` node function.
+    """
     rewriter = llm.with_structured_output(QueryRewrite, method="json_schema")
     system_prompt = REWRITE_SYSTEM_PROMPT.format(max_queries=max_queries)
 
     def rewrite(state: AgentState) -> dict:
+        """Rewrites the latest question into catalog search queries.
+
+        If the latest message is not from the user, or rewriting fails, falls back to searching with the
+        user's own words, which still beats giving up.
+
+        Args:
+            state: Current graph state.
+
+        Returns:
+            A state update with `queries` (at most `max_queries`, blanks removed) and `rewrite_notes`.
+        """
         *history, latest = state["messages"]
         # If rewriting fails, searching with the user's own words still beats giving up.
         fallback = {"queries": [latest.text], "rewrite_notes": ""}

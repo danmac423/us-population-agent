@@ -11,11 +11,30 @@ logger = logging.getLogger(__name__)
 
 
 def build_repair_sql(llm: BaseChatModel, settings: Settings):
-    """Create the node that rewrites SQL which failed validation or execution, given the problems found."""
+    """Creates the node that rewrites SQL which failed validation or execution.
+
+    The model is given the problems found in the previous attempt.
+
+    Args:
+        llm: Strong chat model that rewrites the SQL.
+        settings: Application settings used to fill in the system prompt.
+
+    Returns:
+        The `repair_sql` node function.
+    """
     generator = llm.with_structured_output(SqlGeneration, method="json_schema")
     system_prompt = build_system_prompt(settings)
 
     def repair_sql(state: AgentState) -> dict:
+        """Asks the model to fix the failing query and counts the attempt.
+
+        Args:
+            state: Current graph state. Reads the failing `sql`, its notes and the validation or execution errors.
+
+        Returns:
+            A state update with the new `sql`, its notes, an incremented `sql_attempts` and the
+            validation and execution fields reset.
+        """
         problems = state.get("sql_errors") or [state.get("sql_error") or "Unknown error."]
         prompt = (
             f"{build_prompt(state)}\n\n"

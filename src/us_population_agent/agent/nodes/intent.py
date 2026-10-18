@@ -131,15 +131,42 @@ intent: off_topic"""
 
 
 def state_update(decision: IntentDecision) -> dict:
-    """Partial state update written by the intent node."""
+    """Builds the partial state update written by the intent node.
+
+    Args:
+        decision: The classifier's decision.
+
+    Returns:
+        A state update with `intent` and `intent_reason`.
+    """
     return {"intent": decision.intent, "intent_reason": decision.reason}
 
 
 def build_run_intent(llm: BaseChatModel):
-    """Create the intent node. The classifier sees the recent context and the latest user message."""
+    """Creates the intent node.
+
+    The classifier sees the recent context and the latest user message.
+
+    Args:
+        llm: Chat model that classifies the message.
+
+    Returns:
+        The `run_intent` node function.
+    """
     classifier = llm.with_structured_output(IntentDecision, method="json_schema")
 
     def run_intent(state: AgentState) -> dict:
+        """Classifies the latest user message into one intent.
+
+        If the latest message is not from the user, or the classifier fails or returns an unexpected
+        output, falls back to `needs_clarification` instead of guessing a route.
+
+        Args:
+            state: Current graph state.
+
+        Returns:
+            A state update with `intent` and `intent_reason`.
+        """
         *history, latest = state["messages"]
         if not isinstance(latest, HumanMessage):
             logger.warning("Latest message is not from the user (%s)", latest.type)

@@ -16,10 +16,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def open_graph(settings: Settings) -> AsyncGenerator:
-    """Build the models and open Snowflake and Postgres; yield the ready graph and close everything on exit.
+    """Builds the models, opens Snowflake and Postgres, and yields the ready graph.
 
-    Shared by the CLI and the web API. Raises `LLMInitError`, `SnowflakeInitError` or `psycopg.OperationalError`
-    when a resource is not available.
+    Args:
+        settings: Application settings for the models, Snowflake and the Postgres checkpointer.
+
+    Yields:
+        The compiled graph, ready to be run through its async API.
+
+    Raises:
+        LLMInitError: If a chat model cannot be created.
+        SnowflakeInitError: If the Snowflake connection cannot be opened.
+        psycopg.OperationalError: If the Postgres database is not available.
     """
     llm = build_llm(model_name=settings.anthropic_model_name, effort="low")
     sql_llm = build_llm(model_name=settings.anthropic_strong_model_name, effort="low")

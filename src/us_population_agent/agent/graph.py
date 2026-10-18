@@ -32,40 +32,104 @@ INTENT_ROUTES: dict[str, Route] = {
 
 
 def route_after_intent(state: AgentState) -> Route:
-    """Pick the next node from the classified intent. Anything unknown goes to `clarify`."""
+    """Picks the next node from the classified intent.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        The node matching the intent. Anything unknown goes to `clarify`.
+    """
     return INTENT_ROUTES.get(state.get("intent") or "", "clarify")
 
 
 def route_after_search(state: AgentState) -> Literal["select_tables", "unavailable"]:
-    """If every catalog search failed, stop with a technical message instead of guessing."""
+    """Stops with a technical message if every catalog search failed, instead of guessing.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        `unavailable` if all searches failed, otherwise `select_tables`.
+    """
     return "unavailable" if state.get("search_failed") else "select_tables"
 
 
 def route_after_select_tables(state: AgentState) -> Literal["load_columns", "no_table"]:
+    """Routes on whether the selector chose a table.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        `load_columns` if a table was selected, otherwise `no_table`.
+    """
     return "load_columns" if state.get("selected_table_id") else "no_table"
 
 
 def route_after_load_columns(state: AgentState) -> Literal["generate_sql", "unavailable"]:
+    """Routes on whether the columns of the selected table were loaded.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        `generate_sql` if columns are available, otherwise `unavailable`.
+    """
     return "generate_sql" if state.get("table_columns") else "unavailable"
 
 
 def route_after_generate_sql(state: AgentState) -> Literal["validate_sql", "unavailable", "no_sql"]:
+    """Routes on the result of SQL generation (or repair).
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        `validate_sql` if a query was produced. Otherwise `unavailable` after a technical failure,
+        or `no_sql` if the model decided the data cannot answer the question.
+    """
     if state.get("sql"):
         return "validate_sql"
     return "unavailable" if state.get("technical_failure") else "no_sql"
 
 
 def can_repair(state: AgentState) -> bool:
+    """Checks whether the failing query may be rewritten again.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        True if the number of repair attempts is below the `max_repairs` setting.
+    """
     return (state.get("sql_attempts") or 0) < get_settings().max_repairs
 
 
 def route_after_validate_sql(state: AgentState) -> Literal["execute_sql", "repair_sql", "failed_query"]:
+    """Routes on the result of SQL validation.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        `execute_sql` if the query passed. Otherwise `repair_sql` while repairs remain, or `failed_query`.
+    """
     if not state.get("sql_errors"):
         return "execute_sql"
     return "repair_sql" if can_repair(state) else "failed_query"
 
 
 def route_after_execute_sql(state: AgentState) -> Literal["answer", "repair_sql", "unavailable", "failed_query"]:
+    """Routes on the result of running the query.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        `answer` on success. `unavailable` if Snowflake itself failed, since rewriting the query would not
+        help. Otherwise `repair_sql` while repairs remain, or `failed_query`.
+    """
     if not state.get("sql_error"):
         return "answer"
     if state.get("technical_failure"):
@@ -74,12 +138,27 @@ def route_after_execute_sql(state: AgentState) -> Literal["answer", "repair_sql"
 
 
 def no_table_hint(state: AgentState) -> str | None:
-    """Why no table fits: the selector's reason plus the rewriter's notes (which may say the topic is not in the ACS)."""
+    """Explains why no table fits the question.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        The selector's reason joined with the rewriter's notes (which may say the topic is not in the ACS),
+        or None if both are empty.
+    """
     return " ".join(part for part in (state.get("selection_reason"), state.get("rewrite_notes")) if part) or None
 
 
 def no_sql_hint(state: AgentState) -> str | None:
-    """Why the model wrote no SQL: its notes plus the parts of the question it listed as uncovered."""
+    """Explains why the model wrote no SQL.
+
+    Args:
+        state: Current graph state.
+
+    Returns:
+        The model's notes joined with the parts of the question it listed as uncovered, or None if there are none.
+    """
     parts = [state.get("sql_notes"), *(f"Not covered: {part}." for part in unanswered_parts(state))]
     return " ".join(part for part in parts if part) or None
 
@@ -93,7 +172,22 @@ def build_graph(
     settings: Settings,
     checkpointer: BaseCheckpointSaver,
 ):
-    """Build the chat graph. Conversation history is stored per `thread_id` by the checkpointer."""
+    """Builds the chat graph.
+
+    Conversation history is stored per `thread_id` by the checkpointer.
+
+    Args:
+        llm: Light model for classification, rewriting, table selection and replies.
+        catalog: Search over the catalog of census tables.
+        columns: Source of the columns of a selected table.
+        runner: Executor of the generated SQL.
+        sql_llm: Strong model that writes and repairs SQL.
+        settings: Application settings with the agent limits.
+        checkpointer: Checkpointer that persists the state per thread.
+
+    Returns:
+        The compiled graph.
+    """
 
     builder = StateGraph(AgentState)  # ty: ignore[invalid-argument-type]  # ty rejects TypedDict states in StateGraph
     builder.add_node("intent", build_run_intent(llm))

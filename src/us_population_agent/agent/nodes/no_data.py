@@ -36,7 +36,18 @@ have. Explain this clearly and helpfully, without guessing any number.
 
 
 def build_no_data(llm: BaseChatModel, *, name: str, hint: Callable[[AgentState], str | None]):
-    """Create a node that tells the user the question cannot be answered, using the stage's own reason as the hint."""
+    """Creates a node that tells the user the question cannot be answered.
+
+    The stage's own reason is passed to the model as a hint.
+
+    Args:
+        llm: Chat model that writes the reply.
+        name: Name of the node, used in logs.
+        hint: Function that returns why the question cannot be answered, or None if there is no reason.
+
+    Returns:
+        The node function.
+    """
     return build_reply_node(
         llm,
         name=name,
@@ -48,10 +59,26 @@ def build_no_data(llm: BaseChatModel, *, name: str, hint: Callable[[AgentState],
 
 
 def unavailable(state: AgentState) -> dict:
-    """Technical failure (catalog, metadata, Snowflake or the model unavailable): a fixed message, no model call."""
+    """Replies with a fixed message after a technical failure, without calling the model.
+
+    Covers the catalog, metadata, Snowflake or the model being unavailable.
+
+    Args:
+        state: Current graph state (unused).
+
+    Returns:
+        A state update with the message appended to `messages`.
+    """
     return {"messages": [AIMessage(UNAVAILABLE)]}
 
 
 def failed_query(state: AgentState) -> dict:
-    """The generated query kept failing after repairs. This is not "no data", so a fixed message, no model call."""
+    """Replies with a fixed message when the generated query kept failing after repairs, without calling the model.
+
+    Args:
+        state: Current graph state (unused).
+
+    Returns:
+        A state update with the message appended to `messages`.
+    """
     return {"messages": [AIMessage(FAILED_QUERY)]}

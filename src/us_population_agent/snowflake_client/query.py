@@ -17,12 +17,22 @@ class QueryUnavailableError(QueryError):
 
 @dataclass(frozen=True)
 class QueryResult:
+    """Rows returned by a query, as plain values."""
+
     columns: list[str]
-    rows: list[list]  # plain values only (see `to_plain`)
+    rows: list[list]
 
 
 def to_plain(value):
-    """Convert a Snowflake value to a plain one that the checkpointer can store."""
+    """Converts a Snowflake value to a plain one that the checkpointer can store.
+
+    Args:
+        value: A value returned by the Snowflake connector.
+
+    Returns:
+        The value unchanged if it is None, bool, int, float or str. A Decimal becomes an int if it has no
+        fractional part and a float otherwise. Anything else is converted with `str`.
+    """
     if value is None or isinstance(value, bool | int | float | str):
         return value
     if isinstance(value, Decimal):
@@ -34,11 +44,28 @@ class QueryRunner:
     """Runs generated SELECT queries on the census data (the connection's role is read-only)."""
 
     def __init__(self, connection: SnowflakeConnection, settings: Settings) -> None:
+        """Initializes the runner.
+
+        Args:
+            connection: Open Snowflake connection used to run queries.
+            settings: Application settings providing the query timeout.
+        """
         self._connection = connection
         self._timeout_seconds = settings.query_timeout_seconds
 
     def run(self, sql: str) -> QueryResult:
-        """Execute the query and return all rows. Raises `QueryError`, or `QueryUnavailableError` for infrastructure errors."""
+        """Executes the query and returns all rows.
+
+        Args:
+            sql: The SELECT statement to run.
+
+        Returns:
+            Column names and rows, with values converted by `to_plain`.
+
+        Raises:
+            QueryError: If Snowflake rejects the query (e.g. bad SQL).
+            QueryUnavailableError: If Snowflake cannot run queries at all (connection, network, service).
+        """
         try:
             with self._connection.cursor() as cursor:
                 cursor.execute(sql, timeout=self._timeout_seconds)

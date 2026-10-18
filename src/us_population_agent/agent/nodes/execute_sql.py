@@ -10,13 +10,43 @@ logger = logging.getLogger(__name__)
 class SqlExecutor(Protocol):
     """What the node needs from the query runner; `QueryRunner` implements it."""
 
-    def run(self, sql: str) -> QueryResult: ...
+    def run(self, sql: str) -> QueryResult:
+        """Executes the query and returns all rows.
+
+        Args:
+            sql: The SELECT statement to run.
+
+        Returns:
+            Column names and rows.
+
+        Raises:
+            QueryError: If Snowflake rejects the query.
+            QueryUnavailableError: If Snowflake cannot run queries at all.
+        """
 
 
 def build_execute_sql(runner: SqlExecutor):
-    """Create the node that runs the generated SQL and stores the rows in the state."""
+    """Creates the node that runs the generated SQL and stores the rows in the state.
+
+    Args:
+        runner: Executor that runs the query.
+
+    Returns:
+        The `execute_sql` node function.
+    """
 
     def execute_sql(state: AgentState) -> dict:
+        """Runs the generated SQL and records the result or the error.
+
+        A rejected query sets only `sql_error`, so it can be repaired. Any other failure also sets
+        `technical_failure`, because rewriting the query would not help.
+
+        Args:
+            state: Current graph state. Reads `sql`.
+
+        Returns:
+            A state update with `sql_result` and `sql_error`, plus `technical_failure` on infrastructure errors.
+        """
         sql = state.get("sql")
         if not sql:
             return {"sql_result": None, "sql_error": None}

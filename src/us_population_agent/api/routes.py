@@ -13,6 +13,11 @@ router = APIRouter()
 
 @router.get("/health")
 async def health() -> dict[str, str]:
+    """Reports that the service is running.
+
+    Returns:
+        A dict with `status` set to `ok`.
+    """
     return {"status": "ok"}
 
 
@@ -22,6 +27,22 @@ async def chat(
     graph: Annotated[object, Depends(get_graph)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ChatResponse:
+    """Answers one question, continuing the conversation identified by `thread_id`.
+
+    A new thread is started if the request has no `thread_id`.
+
+    Args:
+        body: The question and an optional thread id.
+        graph: The agent graph.
+        settings: Application settings with the message length and turn timeout limits.
+
+    Returns:
+        The answer together with the id of the thread it belongs to.
+
+    Raises:
+        HTTPException: With status 422 if the message is too long, 504 if the question takes longer
+            than the turn timeout, and 500 if the turn fails.
+    """
     if len(body.message) > settings.max_message_chars:
         raise HTTPException(status_code=422, detail=f"Message longer than {settings.max_message_chars} characters")
 

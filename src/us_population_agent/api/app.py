@@ -13,11 +13,29 @@ def create_app(
     settings: Settings | None = None,
     graph_factory: Callable[[Settings], AbstractAsyncContextManager] = open_graph,
 ) -> FastAPI:
-    """Create the app. The graph is built once at startup and shared by all requests."""
+    """Creates the FastAPI app.
+
+    The graph is built once at startup and shared by all requests.
+
+    Args:
+        settings: Application settings. Defaults to the settings read from the environment.
+        graph_factory: Factory that opens the graph for the given settings. Replaceable in tests.
+
+    Returns:
+        The configured app.
+    """
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+        """Sets up logging and the graph at startup and closes them at shutdown.
+
+        Args:
+            app: The app whose state receives `settings` and `graph`.
+
+        Yields:
+            Control to the app while it serves requests.
+        """
         setup_logging(settings.log_level)
         async with graph_factory(settings) as graph:
             app.state.settings = settings

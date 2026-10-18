@@ -31,9 +31,15 @@ class TableColumns:
 
 
 def split_description(description: str) -> tuple[str, str]:
-    """Split `Column: X | <prefix> | Meaning: <meaning>` into (prefix, meaning).
+    """Splits `Column: X | <prefix> | Meaning: <meaning>` into its prefix and meaning.
 
     A description in another format is returned whole as the meaning, so nothing is lost.
+
+    Args:
+        description: Raw column description from the metadata table.
+
+    Returns:
+        A `(prefix, meaning)` tuple. The prefix is empty if the description has no meaning marker.
     """
     head, marker, meaning = description.partition(MEANING_MARKER)
     if not marker:
@@ -45,6 +51,12 @@ class ColumnCatalog:
     """Hard lookup of the columns that belong to a census table, from the metadata table."""
 
     def __init__(self, connection: SnowflakeConnection, settings: Settings) -> None:
+        """Initializes the catalog.
+
+        Args:
+            connection: Open Snowflake connection used for all lookups.
+            settings: Application settings providing the name of the columns table.
+        """
         self._connection = connection
         # The table name comes from our own settings, not from user input; only the table id is bound.
         self._query = (
@@ -53,9 +65,16 @@ class ColumnCatalog:
         )
 
     def columns_for(self, table_id: str) -> TableColumns | None:
-        """Return the columns of one table (e.g. `B01001`) in numeric order, or None if it has none.
+        """Returns the columns of one table in numeric order.
 
-        Raises `ColumnCatalogError`.
+        Args:
+            table_id: Census table id, e.g. `B01001`.
+
+        Returns:
+            The table's columns with their shared description prefix, or None if the table has no columns.
+
+        Raises:
+            ColumnCatalogError: If the query to Snowflake fails.
         """
         try:
             with self._connection.cursor() as cursor:

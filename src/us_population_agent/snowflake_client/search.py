@@ -30,7 +30,14 @@ class TableHit:
 
 
 def parse_hit(row: dict[str, Any]) -> TableHit | None:
-    """Turn one result row into a `TableHit`, or return None when required fields are missing."""
+    """Turns one result row into a `TableHit`.
+
+    Args:
+        row: A single result row from Cortex Search, including the optional `@scores` entry.
+
+    Returns:
+        The parsed hit, or None if the table id or data table name is missing.
+    """
     table_id = row.get("TABLE_ID")
     data_table_name = row.get("DATA_TABLE_NAME")
     if not table_id or not data_table_name:
@@ -51,6 +58,12 @@ class CatalogSearch:
     """Cortex Search over the catalog of ACS tables."""
 
     def __init__(self, connection: SnowflakeConnection, settings: Settings) -> None:
+        """Initializes the search client.
+
+        Args:
+            connection: Open Snowflake connection used to reach the Cortex Search service.
+            settings: Application settings providing the service location and the result limit.
+        """
         self._limit = settings.search_limit
         self._service = (
             Root(connection)
@@ -60,10 +73,19 @@ class CatalogSearch:
         )
 
     def search(self, query: str) -> list[TableHit]:
-        """Return the best matching tables, best first. Rows with missing fields are skipped.
+        """Finds the census tables that best match a query.
 
-        Raises `CatalogSearchError` when the request fails. The SDK already validates that `results`
-        is a list of dicts, so only the content of each row needs checking here.
+        The SDK already validates that `results` is a list of dicts, so only the content of each row
+        needs checking here. Rows with missing fields are skipped and logged.
+
+        Args:
+            query: Free-text search query.
+
+        Returns:
+            Matching tables, best first, up to the configured search limit.
+
+        Raises:
+            CatalogSearchError: If the search request fails.
         """
         try:
             response = self._service.search(query=query, columns=SEARCH_COLUMNS, limit=self._limit)

@@ -15,7 +15,21 @@ class TurnFailed(Exception):
 
 
 async def run_turn(graph, thread_id: str, message: str, timeout_seconds: int) -> str:
-    """Send one user message to the agent in the given conversation and return its reply."""
+    """Sends one user message to the agent in the given conversation and returns its reply.
+
+    Args:
+        graph: The agent graph, run through its async API.
+        thread_id: Id of the conversation the message belongs to.
+        message: The user's message.
+        timeout_seconds: Time limit for the whole turn.
+
+    Returns:
+        The text of the agent's last message.
+
+    Raises:
+        TurnTimeout: If the agent does not answer within `timeout_seconds`.
+        TurnFailed: If the agent raises an unexpected error.
+    """
     config = {"configurable": {"thread_id": thread_id}}
     try:
         async with asyncio.timeout(timeout_seconds):

@@ -42,6 +42,14 @@ table_id is null)."""
 
 
 def format_candidates(candidates: list[dict]) -> str:
+    """Formats candidate tables as text blocks for the prompt.
+
+    Args:
+        candidates: Candidate tables, each with `table_id`, `title` and `search_text`.
+
+    Returns:
+        One block per candidate with its id, title and description, separated by blank lines.
+    """
     return "\n\n".join(
         f"TABLE_ID: {candidate['table_id']}\nTitle: {candidate['title']}\nDescription: {candidate['search_text']}"
         for candidate in candidates
@@ -49,10 +57,29 @@ def format_candidates(candidates: list[dict]) -> str:
 
 
 def build_select_tables(llm: BaseChatModel):
-    """Create the node that picks the best table among the search candidates."""
+    """Creates the node that picks the best table among the search candidates.
+
+    Args:
+        llm: Chat model that chooses the table.
+
+    Returns:
+        The `select_tables` node function.
+    """
     selector = llm.with_structured_output(TableSelection, method="json_schema")
 
     def select_tables(state: AgentState) -> dict:
+        """Chooses the table that best answers the question.
+
+        The model may invent an id, so only an id that is really among the candidates is accepted.
+        If there are no candidates, or the selection fails, no table is selected.
+
+        Args:
+            state: Current graph state. Reads `candidates` and `rewrite_notes`.
+
+        Returns:
+            A state update with `selected_table_id` (None if nothing fits), `selection_reason` and
+            `selection_unanswered`.
+        """
         candidates = state.get("candidates") or []
         *history, latest = state["messages"]
 

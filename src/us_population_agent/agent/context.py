@@ -6,11 +6,18 @@ from us_population_agent.config import get_settings
 
 
 def format_context(messages: Sequence[AnyMessage], max_tokens: int | None = None) -> str:
-    """Render the latest part of the conversation as a plain transcript (tool messages are skipped).
+    """Renders the latest part of the conversation as a plain transcript.
 
-    The oldest messages are dropped until the rest fits in `max_tokens` (estimated; default: the
-    `max_context_tokens` setting), and the transcript always
-    starts with a user message so it never opens in the middle of an exchange.
+    Tool messages are skipped. The oldest messages are dropped until the rest fits in `max_tokens`
+    (estimated), and the transcript always starts with a user message so it never opens in the middle
+    of an exchange.
+
+    Args:
+        messages: The conversation history.
+        max_tokens: Token budget for the transcript. Defaults to the `max_context_tokens` setting.
+
+    Returns:
+        A transcript with `User:` and `Assistant:` prefixes, or "(none)" if nothing fits.
     """
     max_tokens = max_tokens or get_settings().max_context_tokens
     turns = filter_messages(messages, include_types=["human", "ai"])

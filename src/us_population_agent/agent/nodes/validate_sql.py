@@ -22,7 +22,17 @@ GEOGRAPHY_COLUMNS = {
 
 
 def validate_sql(sql: str, *, settings: Settings, data_table: str, columns: list[dict]) -> list[str]:
-    """Return the problems found in the generated SQL (empty list when it is fine). Does not touch Snowflake."""
+    """Finds the problems in the generated SQL without touching Snowflake.
+
+    Args:
+        sql: The generated SQL.
+        settings: Application settings providing the schema and geography table names.
+        data_table: Name of the data table chosen for the question.
+        columns: Columns of the chosen table, each with a `name`.
+
+    Returns:
+        The problems found, or an empty list if the SQL is fine.
+    """
     try:
         statements = sqlglot.parse(sql, dialect="snowflake")
     except SqlglotError as exc:
@@ -36,7 +46,16 @@ def validate_sql(sql: str, *, settings: Settings, data_table: str, columns: list
 
 
 def check_tables(tree: exp.Query, settings: Settings, data_table: str) -> list[str]:
-    """Only the chosen data table and the geography table are allowed, fully qualified."""
+    """Checks that only the chosen data table and the geography table are used, fully qualified.
+
+    Args:
+        tree: Parsed query.
+        settings: Application settings providing the schema and geography table names.
+        data_table: Name of the data table chosen for the question.
+
+    Returns:
+        A problem for each disallowed table, and one if the data table is not used.
+    """
     data = f"{settings.census_schema}.{data_table}".lower()
     geography = settings.geography_table.lower()
     used = {".".join(part.name for part in table.parts).lower() for table in tree.find_all(exp.Table)}
@@ -51,7 +70,17 @@ def check_tables(tree: exp.Query, settings: Settings, data_table: str) -> list[s
 
 
 def check_columns(tree: exp.Query, known: set[str]) -> list[str]:
-    """Census columns must exist, be quoted and carry the table alias; other names must be geography columns."""
+    """Checks that census columns exist, are quoted and carry the table alias.
+
+    Any other name must be a geography column or an alias defined in the query.
+
+    Args:
+        tree: Parsed query.
+        known: Names of the columns of the chosen data table.
+
+    Returns:
+        A problem for each column that breaks these rules.
+    """
     known_lower = {name.lower(): name for name in known}
     aliases = {alias.alias.upper() for alias in tree.find_all(exp.Alias)}
     errors = []
@@ -70,9 +99,24 @@ def check_columns(tree: exp.Query, known: set[str]) -> list[str]:
 
 
 def build_validate_sql(settings: Settings):
-    """Create the node that checks the generated SQL without running it and stores the problems found."""
+    """Creates the node that checks the generated SQL without running it and stores the problems found.
+
+    Args:
+        settings: Application settings providing the schema and geography table names.
+
+    Returns:
+        The `validate` node function.
+    """
 
     def validate(state: AgentState) -> dict:
+        """Validates the generated SQL.
+
+        Args:
+            state: Current graph state. Reads `sql`, `data_table_name` and `table_columns`.
+
+        Returns:
+            A state update with `sql_errors`, empty if the SQL passed.
+        """
         errors = validate_sql(
             state.get("sql") or "",
             settings=settings,

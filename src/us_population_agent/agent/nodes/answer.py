@@ -44,21 +44,54 @@ estimates) data. You get the question, the query result and notes about how it w
 
 
 def unanswered_parts(state: AgentState) -> list[str]:
-    """Parts of the question that table selection or SQL generation found uncovered, without duplicates."""
+    """Collects the parts of the question that were found uncovered.
+
+    Args:
+        state: Current graph state. Reads the unanswered parts from table selection and SQL generation.
+
+    Returns:
+        The uncovered parts without duplicates, in order of appearance.
+    """
     parts = (state.get("selection_unanswered") or []) + (state.get("sql_unanswered") or [])
     return list(dict.fromkeys(part.strip() for part in parts if part.strip()))
 
 
 def format_result(result: dict) -> str:
+    """Formats a query result as a pipe-separated text table.
+
+    Args:
+        result: Query result with `columns` and `rows`, as stored in `sql_result`.
+
+    Returns:
+        A header line followed by one line per row, or `(no rows)` if the result is empty.
+    """
     header = " | ".join(result["columns"])
     rows = "\n".join(" | ".join(str(value) for value in row) for row in result["rows"])
     return f"{header}\n{rows}" if rows else f"{header}\n(no rows)"
 
 
 def build_answer(llm: BaseChatModel):
-    """Create the node that turns the query result into the final answer for the user."""
+    """Creates the node that turns the query result into the final answer for the user.
+
+    Args:
+        llm: Chat model that writes the answer.
+
+    Returns:
+        The `answer` node function.
+    """
 
     def answer(state: AgentState) -> dict:
+        """Writes the final answer from the query result, its notes and the uncovered parts.
+
+        If the model fails or returns nothing, falls back to the raw result or a fixed message,
+        so the user never gets an empty answer.
+
+        Args:
+            state: Current graph state.
+
+        Returns:
+            A state update with the answer appended to `messages`.
+        """
         *history, latest = state["messages"]
         result = state.get("sql_result")
         error = state.get("sql_error")

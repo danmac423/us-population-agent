@@ -27,7 +27,16 @@ Answer briefly and truthfully.
 
 
 def build_meta(llm: BaseChatModel):
-    """Create the meta node: answers questions about the assistant, the data and the conversation."""
+    """Creates the meta node.
+
+    The node answers questions about the assistant, the data and the conversation.
+
+    Args:
+        llm: Chat model that writes the reply.
+
+    Returns:
+        The `meta` node function.
+    """
     return build_reply_node(
         llm,
         name="meta",
