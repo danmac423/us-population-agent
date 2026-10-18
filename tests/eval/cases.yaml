@@ -1,0 +1,176 @@
+# Evaluation cases for the end-to-end LLM-as-judge suite.
+# Data: ACS 2020 5-year, block groups summed to county / state / country.
+#
+# Fields:
+#   id          unique case id
+#   category    group of cases
+#   question    the user question sent to the agent
+#   history     earlier turns (optional): a question to replay, or a fixed {role, content} message
+#   reference   the reference answer the judge compares against
+
+- id: A1
+  category: counts
+  question: How many people live in Travis County, Texas?
+  reference: "1,250,884"
+
+- id: A2
+  category: counts
+  question: What is the total population of the US?
+  reference: "326,569,308"
+
+- id: A3
+  category: counts
+  question: How many children under 5 live in Cook County, Illinois?
+  reference: "315,368"
+
+- id: A4
+  category: counts
+  question: How many veterans aged 65 and over live in Florida?
+  reference: "761,614"
+
+- id: A5
+  category: counts
+  question: How many veterans are there in the US?
+  reference: "17,835,456"
+
+- id: B1
+  category: rates
+  question: What is the poverty rate in Mississippi?
+  reference: "19.58% (564,439 / 2,883,074)"
+
+- id: B2
+  category: rates
+  question: What is the poverty rate in Autauga County, Alabama?
+  reference: "15.21% (8,394 / 55,181)"
+
+- id: B3
+  category: rates
+  question: What share of adults 25+ in Colorado have a bachelor's degree or higher?
+  reference: "41.60%"
+
+- id: B4
+  category: rates
+  question: How many households in New Mexico have no internet subscription?
+  reference: "172,080 (21.71% of 792,755 households)"
+
+- id: B5
+  category: rates
+  question: What percentage of workers in New York State commute by public transportation?
+  reference: "26.23% of all workers (28.17% excluding people who work from home)"
+
+- id: B6
+  category: rates
+  question: What share of workers in Colorado work from home?
+  reference: "10.80%"
+
+- id: C1
+  category: age
+  question: How many people in Texas are under 18?
+  reference: "7,381,482 (about 25.8% of 28,635,442)"
+
+- id: C2
+  category: age
+  question: What percentage of Maine's population is 65 or older?
+  reference: "20.63%"
+
+- id: C3
+  category: age
+  question: Are there more men or women in Alaska?
+  reference: "More men: 384,653 men vs 352,337 women"
+
+- id: C4
+  category: age
+  question: How many voting-age citizens in Texas live in poverty?
+  reference: "1,980,615 out of 18,087,895 (10.95%)"
+
+- id: D1
+  category: rankings
+  question: Which 10 states have the highest share of renters?
+  reference: "DC 57.46%, NY 45.88%, CA 44.74%, NV 42.93%, HI 39.73%, RI 38.41%, TX 37.73%, MA 37.48%, ND 37.46%, OR 37.23%"
+
+- id: D2
+  category: rankings
+  question: Which counties with at least 100k people have the highest poverty rate? (top 5)
+  reference: "Hidalgo TX 28.44%, Robeson NC 27.06%, Bronx NY 26.96%, Cameron TX 26.68%, Clarke GA 26.53%"
+
+- id: D3
+  category: rankings
+  question: Which 3 states have the lowest poverty rate?
+  reference: "NH 7.42%, MD 9.02%, UT 9.13%"
+
+- id: D4
+  category: rankings
+  question: Compare the share of adults with a bachelor's degree in Colorado vs the whole US
+  reference: "Colorado 41.60% vs US 32.85%"
+
+- id: E1
+  category: medians
+  question: Compare median household income in California and Texas
+  reference: "About $90.4k in California vs about $74.3k in Texas. Mean household income: CA $111.6k, TX $89.5k"
+
+- id: E2
+  category: medians
+  question: What is the median gross rent in Miami-Dade County compared to the US?
+  reference: "About $1,419 in Miami-Dade vs about $1,192 in the US, noted as approximate"
+
+- id: F1
+  category: conversation
+  history:
+    - No internet subscription in New Mexico
+  question: And what share of households in Mississippi has broadband?
+  reference: "75.83%"
+
+- id: F2
+  category: conversation
+  history:
+    - What share of housing units in Los Angeles County are owner-occupied?
+  question: And renters?
+  reference: "53.95% (owner-occupied was 46.05%)"
+
+- id: G1
+  category: clarification
+  question: Show me data about Florida
+  reference: Ask which topic the user wants, such as population, income or housing.
+
+- id: G2
+  category: clarification
+  question: What is the population of Seattle?
+  reference: Cities are not available. Suggest King County, WA or the state of Washington.
+
+- id: G3
+  category: clarification
+  question: How rich is Washington?
+  reference: Ask whether state or county is meant and which measure (median income, per capita income, poverty).
+
+- id: H1
+  category: meta
+  question: What year is this data from?
+  reference: ACS 2020, 5-year estimates.
+
+- id: H2
+  category: meta
+  history:
+    - role: user
+      content: What is the poverty rate in Mississippi?
+    - role: assistant
+      content: >-
+        The poverty rate in Mississippi is 19.58%: 564,439 of 2,883,074 people
+        for whom poverty status is determined (ACS 2020 5-year estimates).
+  question: How did you calculate that poverty rate?
+  reference: >-
+    Explains the method: people with income below 1.00 x the poverty threshold
+    (the official poverty definition) divided by people for whom poverty status
+    is determined, based on ACS 2020 5-year estimates.
+    Repeating figures from the previous answer (564,439; 2,883,074; 19.58%) is allowed.
+    Table or column identifiers are not required.
+    Must not run new queries or introduce figures that are not in the history.
+
+- id: I1
+  category: off_topic
+  question: How has Texas population changed since 2010?
+  reference: The data covers 2020 only, so trends over time are not available.
+
+- id: I2
+  category: off_topic
+  question: What is the population of Poland?
+  reference: The data covers the United States only.
