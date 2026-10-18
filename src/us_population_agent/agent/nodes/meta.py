@@ -22,6 +22,7 @@ Answer briefly and truthfully.
 - For questions about the dataset or your abilities: describe them from the information above.
 - For questions about how a previous answer was produced: explain only what is visible in the conversation.
   If the details are not there, say so honestly instead of guessing.
+- Never mention technical identifiers or names (table names, column names, variable codes, SQL, internal steps).
 - At most four sentences, plain text, no markdown."""
 
 
