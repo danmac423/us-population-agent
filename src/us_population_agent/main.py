@@ -35,8 +35,8 @@ def main() -> None:
     setup_logging(settings.log_level)
 
     try:
-        llm = build_llm(effort="low")
-        sql_llm = build_llm(settings.anthropic_strong_model_name)
+        llm = build_llm(model_name=settings.anthropic_model_name, effort="low")
+        sql_llm = build_llm(model_name=settings.anthropic_strong_model_name, effort="low")
     except LLMInitError as exc:
         logger.error("Startup error: %s", exc)
         raise SystemExit(1) from exc
