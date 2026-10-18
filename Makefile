@@ -1,4 +1,4 @@
-.PHONY: install fmt lint typecheck test test-unit test-integration check api run clean
+.PHONY: install fmt lint typecheck test test-unit test-integration eval eval-generate eval-judge check api frontend run clean
 
 install:
 	uv sync
@@ -24,10 +24,22 @@ test-unit:
 test-integration:
 	uv run pytest tests/integration
 
+eval:
+	uv run python tests/eval/run_eval.py run $(ARGS)
+
+eval-generate:
+	uv run python tests/eval/run_eval.py generate $(ARGS)
+
+eval-judge:
+	uv run python tests/eval/run_eval.py judge $(ARGS)
+
 check: lint typecheck test
 
 api:
 	uv run uvicorn --factory us_population_agent.api:create_app --reload
+
+frontend:
+	uv run --group frontend streamlit run frontend/app.py
 
 run:
 	uv run us_population_agent

@@ -30,8 +30,14 @@ dev = [
     "pre-commit>=4.0.0",
     "pytest>=9.1.1",
     "pytest-cov>=6.0.0",
+    "pyyaml>=6.0.3",
     "ruff>=0.17.1",
     "ty>=0.0.89",
+]
+frontend = [
+    "httpx>=0.28.1",
+    "python-dotenv>=1.2.4",
+    "streamlit>=1.66.0",
 ]
 
 [tool.ruff]
