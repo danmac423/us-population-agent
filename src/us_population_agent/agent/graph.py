@@ -13,11 +13,15 @@ from us_population_agent.agent.nodes.load_columns import ColumnSource, build_loa
 from us_population_agent.agent.nodes.meta import build_meta
 from us_population_agent.agent.nodes.no_data import build_no_data, unavailable
 from us_population_agent.agent.nodes.off_topic import build_off_topic
+from us_population_agent.agent.nodes.repair_sql import build_repair_sql
 from us_population_agent.agent.nodes.rewrite import build_rewrite
 from us_population_agent.agent.nodes.search import TableSearcher, build_search
 from us_population_agent.agent.nodes.select_tables import build_select_tables
+from us_population_agent.agent.nodes.validate_sql import build_validate_sql
 from us_population_agent.agent.state import AgentState
 from us_population_agent.config import Settings
+
+MAX_REPAIRS = 2  # how many times a failing query is rewritten before giving up
 
 Route = Literal["rewrite", "clarify", "meta", "off_topic"]
 
@@ -47,8 +51,24 @@ def route_after_load_columns(state: AgentState) -> Literal["generate_sql", "unav
     return "generate_sql" if state.get("table_columns") else "unavailable"
 
 
-def route_after_generate_sql(state: AgentState) -> Literal["execute_sql", "no_sql"]:
-    return "execute_sql" if state.get("sql") else "no_sql"
+def route_after_generate_sql(state: AgentState) -> Literal["validate_sql", "no_sql"]:
+    return "validate_sql" if state.get("sql") else "no_sql"
+
+
+def can_repair(state: AgentState) -> bool:
+    return (state.get("sql_attempts") or 0) < MAX_REPAIRS
+
+
+def route_after_validate_sql(state: AgentState) -> Literal["execute_sql", "repair_sql", "no_sql"]:
+    if not state.get("sql_errors"):
+        return "execute_sql"
+    return "repair_sql" if can_repair(state) else "no_sql"
+
+
+def route_after_execute_sql(state: AgentState) -> Literal["answer", "repair_sql", "no_sql"]:
+    if not state.get("sql_error"):
+        return "answer"
+    return "repair_sql" if can_repair(state) else "no_sql"
 
 
 def build_graph(
@@ -70,6 +90,8 @@ def build_graph(
     builder.add_node("select_tables", build_select_tables(llm))
     builder.add_node("load_columns", build_load_columns(columns))
     builder.add_node("generate_sql", build_generate_sql(sql_llm, settings))
+    builder.add_node("repair_sql", build_repair_sql(sql_llm, settings))
+    builder.add_node("validate_sql", build_validate_sql(settings))
     builder.add_node("execute_sql", build_execute_sql(runner))
     builder.add_node("answer", build_answer(llm))
     builder.add_node("no_table", build_no_data(llm, name="no_table", hint=lambda state: state.get("selection_reason")))
@@ -85,7 +107,9 @@ def build_graph(
     builder.add_conditional_edges("select_tables", route_after_select_tables)
     builder.add_conditional_edges("load_columns", route_after_load_columns)
     builder.add_conditional_edges("generate_sql", route_after_generate_sql)
-    builder.add_edge("execute_sql", "answer")
+    builder.add_conditional_edges("validate_sql", route_after_validate_sql)
+    builder.add_conditional_edges("execute_sql", route_after_execute_sql)
+    builder.add_conditional_edges("repair_sql", route_after_generate_sql)
     builder.add_edge("answer", END)
     builder.add_edge("no_table", END)
     builder.add_edge("no_sql", END)

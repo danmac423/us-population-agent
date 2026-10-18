@@ -31,6 +31,14 @@ class Settings(BaseSettings):
 
     log_level: str = "WARNING"
 
+    @property
+    def census_schema(self) -> str:
+        return f"{self.snowflake_census_database}.{self.snowflake_census_schema}"
+
+    @property
+    def geography_table(self) -> str:
+        return f"{self.snowflake_database}.{self.snowflake_schema}.{self.snowflake_geography_table}"
+
 
 @lru_cache
 def get_settings() -> Settings:

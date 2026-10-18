@@ -35,6 +35,9 @@ class AgentState(TypedDict):
     sql: str | None
     sql_notes: str | None
     sql_columns: list[dict] | None
+    sql_attempts: int | None  # how many times repair_sql has rewritten the query
+    # validate_sql node
+    sql_errors: list[str] | None  # problems found in `sql`; empty when it passed
     # execute_sql node
     sql_result: dict | None  # columns, rows
     sql_error: str | None

@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary,pool]>=3.3.6",
     "pydantic-settings>=2.16.0",
     "snowflake>=1.13.2",
+    "sqlglot>=30.23.0",
 ]
 
 [project.scripts]

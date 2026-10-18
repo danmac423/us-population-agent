@@ -150,13 +150,46 @@ set sql to null and explain in notes what is missing."""
 
 
 def build_system_prompt(settings: Settings) -> str:
-    census_schema = f"{settings.snowflake_census_database}.{settings.snowflake_census_schema}"
-    geography_schema = f"{settings.snowflake_database}.{settings.snowflake_schema}.{settings.snowflake_geography_table}"
-    return GENERATE_SQL_SYSTEM_PROMPT.format(census_schema=census_schema, geography=geography_schema)
+    return GENERATE_SQL_SYSTEM_PROMPT.format(census_schema=settings.census_schema, geography=settings.geography_table)
 
 
 def format_columns(columns: list[dict]) -> str:
     return "\n".join(f"{column['name']} | {column['meaning']}" for column in columns)
+
+
+def build_prompt(state: AgentState) -> str:
+    """The user-side prompt shared by generation and repair: question, context and the table's columns."""
+    *history, latest = state["messages"]
+    return (
+        f"Conversation so far:\n{format_context(history)}\n\n"
+        f"Question: {latest.text}\n\n"
+        f"Rewriter notes: {state.get('rewrite_notes') or 'none'}\n\n"
+        f"DATA_TABLE_NAME: {state.get('data_table_name')}\n"
+        f"Description shared by all columns: {state.get('table_prefix') or 'none'}\n\n"
+        f"Columns (COLUMN_NAME | Meaning):\n{format_columns(state.get('table_columns') or [])}"
+    )
+
+
+def run_generator(generator, system_prompt: str, prompt: str, columns: list[dict]) -> dict:
+    """Call the structured-output model and turn its answer into state fields (sql, notes, columns)."""
+    failed = {"sql": None, "sql_notes": "SQL generation failed.", "sql_columns": []}
+    try:
+        result = generator.invoke([SystemMessage(system_prompt), HumanMessage(prompt)])
+    except Exception:
+        logger.exception("SQL generation failed")
+        return failed
+
+    if not isinstance(result, SqlGeneration):
+        logger.error("Unexpected generator output: %r", result)
+        return failed
+
+    # The model may invent columns, so keep only those that really belong to the table.
+    known = {column["name"] for column in columns}
+    used = [column.model_dump() for column in result.selected_columns if column.column_name in known]
+    if len(used) != len(result.selected_columns):
+        logger.warning("Generator listed unknown columns: %r", result.selected_columns)
+    logger.info("Generated SQL: %s (%s)", result.sql, result.notes)
+    return {"sql": result.sql, "sql_notes": result.notes, "sql_columns": used}
 
 
 def build_generate_sql(llm: BaseChatModel, settings: Settings):
@@ -165,37 +198,11 @@ def build_generate_sql(llm: BaseChatModel, settings: Settings):
     system_prompt = build_system_prompt(settings)
 
     def generate_sql(state: AgentState) -> dict:
+        # A new question starts with a clean slate for validation, execution and repair.
+        fresh = {"sql_attempts": 0, "sql_errors": None, "sql_error": None, "sql_result": None}
         columns = state.get("table_columns") or []
-        data_table_name = state.get("data_table_name")
-        if not columns or not data_table_name:
-            return {"sql": None, "sql_notes": "No table columns to build a query from.", "sql_columns": []}
-
-        failed = {"sql": None, "sql_notes": "SQL generation failed.", "sql_columns": []}
-        *history, latest = state["messages"]
-        prompt = (
-            f"Conversation so far:\n{format_context(history)}\n\n"
-            f"Question: {latest.text}\n\n"
-            f"Rewriter notes: {state.get('rewrite_notes') or 'none'}\n\n"
-            f"DATA_TABLE_NAME: {data_table_name}\n"
-            f"Description shared by all columns: {state.get('table_prefix') or 'none'}\n\n"
-            f"Columns (COLUMN_NAME | Meaning):\n{format_columns(columns)}"
-        )
-        try:
-            result = generator.invoke([SystemMessage(system_prompt), HumanMessage(prompt)])
-        except Exception:
-            logger.exception("SQL generation failed")
-            return failed
-
-        if not isinstance(result, SqlGeneration):
-            logger.error("Unexpected generator output: %r", result)
-            return failed
-
-        # The model may invent columns, so keep only those that really belong to the table.
-        known = {column["name"] for column in columns}
-        used = [column.model_dump() for column in result.selected_columns if column.column_name in known]
-        if len(used) != len(result.selected_columns):
-            logger.warning("Generator listed unknown columns: %r", result.selected_columns)
-        logger.info("Generated SQL: %s (%s)", result.sql, result.notes)
-        return {"sql": result.sql, "sql_notes": result.notes, "sql_columns": used}
+        if not columns or not state.get("data_table_name"):
+            return {"sql": None, "sql_notes": "No table columns to build a query from.", "sql_columns": [], **fresh}
+        return {**run_generator(generator, system_prompt, build_prompt(state), columns), **fresh}
 
     return generate_sql
