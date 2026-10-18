@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import logging
 import sys
 
@@ -7,7 +8,7 @@ from langchain_core.messages import HumanMessage
 from pydantic import ValidationError
 
 from us_population_agent.agent.graph import build_graph
-from us_population_agent.config import get_settings
+from us_population_agent.config import Settings, get_settings
 from us_population_agent.llm.factory import LLMInitError, build_llm
 from us_population_agent.logging_config import setup_logging
 from us_population_agent.persistence.checkpointer import open_checkpointer
@@ -43,12 +44,7 @@ def main() -> None:
     logger.info("LLM ready")
 
     try:
-        with open_connection(settings) as connection, open_checkpointer(settings.database_url) as checkpointer:
-            catalog = CatalogSearch(connection, settings)
-            columns = ColumnCatalog(connection, settings)
-            runner = QueryRunner(connection, settings)
-            graph = build_graph(llm, catalog, columns, runner, sql_llm, settings, checkpointer)
-            run_chat(graph, args.thread or settings.default_thread_id)
+        asyncio.run(chat(settings, llm, sql_llm, args.thread or settings.default_thread_id))
     except SnowflakeInitError as exc:
         logger.error("Startup error: %s", exc)
         raise SystemExit(1) from exc
@@ -57,13 +53,23 @@ def main() -> None:
         raise SystemExit(1) from exc
 
 
-def run_chat(graph, thread_id: str) -> None:
+async def chat(settings: Settings, llm, sql_llm, thread_id: str) -> None:
+    with open_connection(settings) as connection:
+        async with open_checkpointer(settings.database_url) as checkpointer:
+            catalog = CatalogSearch(connection, settings)
+            columns = ColumnCatalog(connection, settings)
+            runner = QueryRunner(connection, settings)
+            graph = build_graph(llm, catalog, columns, runner, sql_llm, settings, checkpointer)
+            await run_chat(graph, thread_id)
+
+
+async def run_chat(graph, thread_id: str) -> None:
     config = {"configurable": {"thread_id": thread_id}}
     print(f"US population assistant (conversation: {thread_id}). Type 'exit' to quit.")
 
     while True:
         try:
-            text = input("> ").strip()
+            text = (await asyncio.to_thread(input, "> ")).strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -73,7 +79,7 @@ def run_chat(graph, thread_id: str) -> None:
             break
 
         try:
-            result = graph.invoke({"messages": [HumanMessage(text)]}, config)
+            result = await graph.ainvoke({"messages": [HumanMessage(text)]}, config)
         except Exception:
             # A failure inside one turn must not end the whole conversation.
             logger.exception("The turn failed")
