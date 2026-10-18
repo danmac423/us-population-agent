@@ -5,13 +5,18 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.143.3",
     "langchain-anthropic>=1.7.6",
     "langchain-core>=1.6.12",
+    "langgraph>=1.2.16",
+    "langgraph-checkpoint-postgres>=3.2.0",
+    "langsmith>=0.14.11",
+    "psycopg[binary,pool]>=3.3.6",
     "pydantic-settings>=2.16.0",
+    "snowflake>=1.13.2",
+    "sqlglot>=30.23.0",
+    "uvicorn[standard]>=0.54.0",
 ]
-
-[project.scripts]
-us_population_agent = "us_population_agent.main:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -19,20 +24,31 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pre-commit>=4.0.0",
     "pytest>=9.1.1",
     "pytest-cov>=6.0.0",
+    "pyyaml>=6.0.3",
     "ruff>=0.17.1",
     "ty>=0.0.89",
+]
+frontend = [
+    "httpx>=0.28.1",
+    "python-dotenv>=1.2.4",
+    "streamlit>=1.66.0",
 ]
 
 [tool.ruff]
 target-version = "py313"
 line-length = 120
 
+[tool.ty.src]
+exclude = ["tests/**"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = ["integration: runs the whole graph with mocked models and Snowflake"]
 
 [tool.coverage.run]
 source = ["src"]

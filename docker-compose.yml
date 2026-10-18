@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agent
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Inside the compose network the database is reachable as `postgres`, not `localhost`.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/agent
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build: .
+    restart: unless-stopped
+    # No env_file: the frontend does not need the API keys, only the address of the API.
+    environment:
+      API_URL: http://api:8000
+    command: ["streamlit", "run", "frontend/app.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
+    ports:
+      - "${FRONTEND_PORT:-8501}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Public tunnel to the frontend (HTTPS, fixed domain). Started only with `--profile public`.
+  ngrok:
+    image: ngrok/ngrok:latest
+    profiles: ["public"]
+    restart: unless-stopped
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    command: ["http", "--url=${NGROK_DOMAIN:-}", "frontend:8501"]
+    depends_on:
+      - frontend
+
+volumes:
+  pgdata:

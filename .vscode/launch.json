@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Chat (debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/.venv/bin/us_population_agent",
+      "args": ["--thread", "debug2"],
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
+      "justMyCode": false
+    }
+  ]
+}
