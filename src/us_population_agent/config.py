@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     max_candidates: int = Field(default=8, ge=1)  # candidate tables passed to the table selector
     search_limit: int = Field(default=5, ge=1)  # tables returned by one catalog search query
 
+    # Model calls: transient errors (network, 429, 5xx) are retried with exponential backoff.
+    llm_max_retries: int = Field(default=4, ge=0)
+    llm_timeout_seconds: int = Field(default=30, ge=1)
+
     # Snowflake timeouts.
     query_timeout_seconds: int = Field(default=30, ge=1)
     login_timeout_seconds: int = Field(default=20, ge=1)

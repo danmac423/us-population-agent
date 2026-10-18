@@ -35,7 +35,6 @@ def main() -> None:
 
     try:
         llm = build_llm(effort="low")
-        intent_llm = build_llm(effort="low")  # a smaller model can be used here later
         sql_llm = build_llm(settings.anthropic_strong_model_name)
     except LLMInitError as exc:
         logger.error("Startup error: %s", exc)
@@ -47,7 +46,7 @@ def main() -> None:
             catalog = CatalogSearch(connection, settings)
             columns = ColumnCatalog(connection, settings)
             runner = QueryRunner(connection, settings)
-            graph = build_graph(llm, intent_llm, catalog, columns, runner, sql_llm, settings, checkpointer)
+            graph = build_graph(llm, catalog, columns, runner, sql_llm, settings, checkpointer)
             run_chat(graph, args.thread or settings.default_thread_id)
     except SnowflakeInitError as exc:
         logger.error("Startup error: %s", exc)

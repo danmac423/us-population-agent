@@ -86,7 +86,6 @@ def no_sql_hint(state: AgentState) -> str | None:
 
 def build_graph(
     llm: BaseChatModel,
-    intent_llm: BaseChatModel,
     catalog: TableSearcher,
     columns: ColumnSource,
     runner: SqlExecutor,
@@ -97,8 +96,8 @@ def build_graph(
     """Build the chat graph. Conversation history is stored per `thread_id` by the checkpointer."""
 
     builder = StateGraph(AgentState)  # ty: ignore[invalid-argument-type]  # ty rejects TypedDict states in StateGraph
-    builder.add_node("intent", build_run_intent(intent_llm))
-    builder.add_node("rewrite", build_rewrite(intent_llm, settings.max_search_queries))
+    builder.add_node("intent", build_run_intent(llm))
+    builder.add_node("rewrite", build_rewrite(llm, settings.max_search_queries))
     builder.add_node("search", build_search(catalog, settings.max_candidates))
     builder.add_node("select_tables", build_select_tables(llm))
     builder.add_node("load_columns", build_load_columns(columns))

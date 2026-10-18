@@ -22,7 +22,8 @@ def build_llm(
             model=model_name or settings.anthropic_model_name,
             effort=effort,
             api_key=settings.anthropic_api_key,
-            timeout=30,
+            max_retries=settings.llm_max_retries,
+            timeout=settings.llm_timeout_seconds,
         )
     except Exception as e:
         logger.exception("LLM initialisation failed")
