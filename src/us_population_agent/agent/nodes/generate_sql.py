@@ -42,8 +42,8 @@ Use ONLY the listed columns. Never invent column or table names.
 3. If no column matches, do not write SQL: return sql = null and explain in notes.
 
 # PARTIAL, AMBIGUOUS OR CONFLICTING QUESTIONS
-- Part of the question can be answered: write SQL for that part only and say in notes, in plain words, which
-  part is not covered and why (for example "income by race is not in this table").
+- Part of the question can be answered: write SQL for that part only. List each part that is not covered in
+  `unanswered`, in a few plain words (for example "income by race"), and say why in notes.
 - The question names a year other than 2020, a city, a ZIP code or another unsupported geography: do not
   substitute silently. If a close supported alternative exists (the county of a city, 2020 for another year),
   use it and say so in notes; otherwise return sql = null.
@@ -145,7 +145,8 @@ separately) and say in notes:
 - Exactly one SELECT.
 
 # OUTPUT
-Fill in selected_columns (column_name and role), then sql and notes. If the data cannot answer the question,
+Fill in selected_columns (column_name and role), then sql, unanswered and notes. unanswered holds the parts of the
+question the query does not cover (empty list if it covers everything). If the data cannot answer the question,
 set sql to null and explain in notes what is missing."""
 
 
@@ -172,7 +173,8 @@ def build_prompt(state: AgentState) -> str:
 
 def run_generator(generator, system_prompt: str, prompt: str, columns: list[dict]) -> dict:
     """Call the structured-output model and turn its answer into state fields (sql, notes, columns)."""
-    failed = {"sql": None, "sql_notes": "SQL generation failed.", "sql_columns": []}
+    # A failed call says nothing about the data, so it is flagged as technical instead of explained as "no data".
+    failed = {"sql": None, "sql_notes": None, "sql_columns": [], "sql_unanswered": [], "technical_failure": True}
     try:
         result = generator.invoke([SystemMessage(system_prompt), HumanMessage(prompt)])
     except Exception:
@@ -189,7 +191,13 @@ def run_generator(generator, system_prompt: str, prompt: str, columns: list[dict
     if len(used) != len(result.selected_columns):
         logger.warning("Generator listed unknown columns: %r", result.selected_columns)
     logger.info("Generated SQL: %s (%s)", result.sql, result.notes)
-    return {"sql": result.sql, "sql_notes": result.notes, "sql_columns": used}
+    return {
+        "sql": result.sql,
+        "sql_notes": result.notes,
+        "sql_columns": used,
+        "sql_unanswered": result.unanswered,
+        "technical_failure": False,
+    }
 
 
 def build_generate_sql(llm: BaseChatModel, settings: Settings):
@@ -202,7 +210,14 @@ def build_generate_sql(llm: BaseChatModel, settings: Settings):
         fresh = {"sql_attempts": 0, "sql_errors": None, "sql_error": None, "sql_result": None}
         columns = state.get("table_columns") or []
         if not columns or not state.get("data_table_name"):
-            return {"sql": None, "sql_notes": "No table columns to build a query from.", "sql_columns": [], **fresh}
+            return {
+                "sql": None,
+                "sql_notes": "No table columns to build a query from.",
+                "sql_columns": [],
+                "sql_unanswered": [],
+                "technical_failure": False,
+                **fresh,
+            }
         return {**run_generator(generator, system_prompt, build_prompt(state), columns), **fresh}
 
     return generate_sql

@@ -2,7 +2,7 @@ import logging
 from typing import Protocol
 
 from us_population_agent.agent.state import AgentState
-from us_population_agent.snowflake_client.query import QueryError, QueryResult
+from us_population_agent.snowflake_client.query import QueryError, QueryResult, QueryUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,9 @@ def build_execute_sql(runner: SqlExecutor):
 
         try:
             result = runner.run(sql)
+        except QueryUnavailableError as exc:
+            logger.error("Snowflake is unavailable: %s", exc)
+            return {"sql_result": None, "sql_error": str(exc), "technical_failure": True}
         except QueryError as exc:
             logger.warning("Query failed: %s", exc)
             return {"sql_result": None, "sql_error": str(exc)}

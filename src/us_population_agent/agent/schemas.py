@@ -31,6 +31,11 @@ class TableSelection(BaseModel):
     table_id: str | None = Field(
         description="TABLE_ID of the chosen candidate, or null when no candidate can answer the question."
     )
+    unanswered: list[str] = Field(
+        default_factory=list,
+        description="Short plain-words parts of the question the chosen table cannot answer; empty if it covers "
+        "everything or table_id is null.",
+    )
 
 
 class ColumnRole(BaseModel):
@@ -46,4 +51,8 @@ class SqlGeneration(BaseModel):
     # Columns come first so they are chosen before the SQL that uses them.
     selected_columns: list[ColumnRole] = Field(description="Columns used in the query; empty when sql is null.")
     sql: str | None = Field(description="One Snowflake SELECT query, or null when the data cannot answer.")
+    unanswered: list[str] = Field(
+        default_factory=list,
+        description="Short plain-words parts of the question the query does not cover; empty if it covers everything.",
+    )
     notes: str = Field(description="Assumptions, approximations, ambiguities, or why sql is null; empty if none.")

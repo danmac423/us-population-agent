@@ -30,10 +30,15 @@ and breakdowns (the categories the table is split into, level by level).
    similar tables.
 5. If several tables fit, pick the most general one.
 6. If no candidate can answer the question, return null and explain what is missing.
+7. Only one table is used. If the question has several parts and the chosen table covers only some of them
+   (for example it asks for income and education and you chose an income table), choose the table for the main
+   part and list the other parts in "unanswered".
 
 # OUTPUT
 Fill in "reason" first (one or two sentences comparing the best candidates), then "table_id" with the TABLE_ID
-of the chosen candidate. Use a TABLE_ID exactly as listed."""
+of the chosen candidate. Use a TABLE_ID exactly as listed. Then fill in "unanswered" with the parts of the
+question the chosen table cannot answer, each in a few plain words (empty list if it covers everything or
+table_id is null)."""
 
 
 def format_candidates(candidates: list[dict]) -> str:
@@ -52,7 +57,7 @@ def build_select_tables(llm: BaseChatModel):
         *history, latest = state["messages"]
 
         if not candidates:
-            return {"selected_table_id": None, "selection_reason": "No candidate tables."}
+            return {"selected_table_id": None, "selection_reason": "No candidate tables.", "selection_unanswered": []}
 
         prompt = (
             f"Conversation so far:\n{format_context(history)}\n\n"
@@ -64,17 +69,29 @@ def build_select_tables(llm: BaseChatModel):
             result = selector.invoke([SystemMessage(SELECT_TABLES_SYSTEM_PROMPT), HumanMessage(prompt)])
         except Exception:
             logger.exception("Table selection failed")
-            return {"selected_table_id": None, "selection_reason": "The table selection failed."}
+            return {
+                "selected_table_id": None,
+                "selection_reason": "The table selection failed.",
+                "selection_unanswered": [],
+            }
 
         if not isinstance(result, TableSelection):
             logger.error("Unexpected selector output: %r", result)
-            return {"selected_table_id": None, "selection_reason": "The table selection failed."}
+            return {
+                "selected_table_id": None,
+                "selection_reason": "The table selection failed.",
+                "selection_unanswered": [],
+            }
 
         # The model may invent an id, so accept only one that is really among the candidates.
         table_id = result.table_id if result.table_id in {c["table_id"] for c in candidates} else None
         if table_id is None and result.table_id is not None:
             logger.warning("Selector returned %r, which is not a candidate", result.table_id)
         logger.info("Selected table: %s (%s)", table_id, result.reason)
-        return {"selected_table_id": table_id, "selection_reason": result.reason}
+        return {
+            "selected_table_id": table_id,
+            "selection_reason": result.reason,
+            "selection_unanswered": result.unanswered if table_id else [],
+        }
 
     return select_tables

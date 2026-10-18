@@ -5,7 +5,6 @@ DATASET_SUMMARY = """- Source: American Community Survey (ACS) 2020 5-year estim
   * county (COUNTY_NAME, e.g. "Autauga County", "Orleans Parish")
   * state (STATE_ABBR, includes DC and Puerto Rico)
   * whole country
-- Geography also has land/water area and CBG centroid latitude/longitude.
 - Topics (ACS tables): population, age, sex, race, ethnicity, ancestry, citizenship,
   nativity, language, education, school enrollment, employment, occupation, industry,
   commuting, income, earnings, poverty, public assistance, health insurance, disability,
@@ -14,5 +13,6 @@ DATASET_SUMMARY = """- Source: American Community Survey (ACS) 2020 5-year estim
 - Supported operations: totals, counts, percentages/shares, comparisons between
   areas, rankings (e.g. top 10 counties), values per CBG.
 - NOT available: other years or trends over time, data outside the US, cities/ZIP codes/
-  metro areas/congressional districts as filters, individual-level records, forecasts,
+  metro areas/congressional districts as filters, land/water area, coordinates,
+  individual-level records, forecasts,
   margins-of-error analysis, non-census data (crime, prices today, weather, elections results)."""

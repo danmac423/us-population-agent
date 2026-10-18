@@ -27,6 +27,7 @@ class AgentState(TypedDict):
     # select_tables node
     selected_table_id: str | None
     selection_reason: str | None
+    selection_unanswered: list[str] | None  # parts of the question the chosen table cannot answer
     # load_columns node
     data_table_name: str | None
     table_prefix: str | None  # table, topic, title and universe shared by all columns
@@ -35,7 +36,9 @@ class AgentState(TypedDict):
     sql: str | None
     sql_notes: str | None
     sql_columns: list[dict] | None
+    sql_unanswered: list[str] | None  # parts of the question the query does not cover
     sql_attempts: int | None  # how many times repair_sql has rewritten the query
+    technical_failure: bool | None  # the model or Snowflake failed; says nothing about whether the data exists
     # validate_sql node
     sql_errors: list[str] | None  # problems found in `sql`; empty when it passed
     # execute_sql node

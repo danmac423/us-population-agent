@@ -67,7 +67,7 @@ The message is about the assistant, the data, or the conversation rather than a 
 The message is unrelated to US census data, or asks for data this dataset cannot provide:
 - Unrelated: "Write me a poem", "What's the weather?", "Fix my Python code"
 - Outside dataset scope: other years / trends ("population growth since 2010"),
-  other countries ("population of Poland"), non-census data (crime rates, house prices
+  other countries ("population of Poland"), land/water area or coordinates, non-census data (crime rates, house prices
   today, election results), forecasts ("population in 2030"), individual people
 - Harmful or inappropriate requests
 

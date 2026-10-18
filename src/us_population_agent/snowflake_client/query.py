@@ -8,7 +8,11 @@ TIMEOUT_SECONDS = 30
 
 
 class QueryError(Exception):
-    """Raised when a generated query fails in Snowflake."""
+    """Raised when Snowflake rejects a generated query (bad SQL), so rewriting the query can help."""
+
+
+class QueryUnavailableError(QueryError):
+    """Raised when Snowflake cannot run queries at all (connection, network, service), so rewriting will not help."""
 
 
 @dataclass(frozen=True)
@@ -33,13 +37,15 @@ class QueryRunner:
         self._connection = connection
 
     def run(self, sql: str) -> QueryResult:
-        """Execute the query and return all rows. Raises `QueryError`."""
+        """Execute the query and return all rows. Raises `QueryError`, or `QueryUnavailableError` for infrastructure errors."""
         try:
             with self._connection.cursor() as cursor:
                 cursor.execute(sql, timeout=TIMEOUT_SECONDS)
                 rows = cursor.fetchall()
                 columns = [column.name for column in cursor.description or []]
-        except snowflake.connector.Error as exc:
+        except snowflake.connector.ProgrammingError as exc:
             raise QueryError(str(exc)) from exc
+        except snowflake.connector.Error as exc:
+            raise QueryUnavailableError(str(exc)) from exc
 
         return QueryResult(columns=columns, rows=[[to_plain(value) for value in row] for row in rows])

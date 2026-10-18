@@ -27,14 +27,22 @@ estimates) data. You get the question, the query result and notes about how it w
 - Mention the assumptions and approximations from the notes when they affect how the number should be read
   (for example "median is approximated from block-group medians", "Baldwin County exists in AL and GA").
 - N_CBG is the number of census block groups behind a row. Do not mention it unless it is 0 or looks wrong.
-- If the notes say that part of the question is not covered or that an assumption was made (another year, a
-  county instead of a city, one reading of an ambiguous question), say so clearly next to the number and offer
-  to answer the missing part differently.
+- If the notes say that an assumption was made (another year, a county instead of a city, one reading of an
+  ambiguous question), say so clearly next to the number.
+- If "Not answered" lists parts of the question, answer what the result covers, then state plainly which parts
+  could not be answered here and offer to look them up in a separate question. Never guess those parts.
 - If the result has no rows or the query failed, say plainly that no data was found. Do not guess a value.
-  Use the notes to explain what is missing and suggest a way to rephrase.
+  Use the notes to explain what is missing. Suggest how to retry: check the spelling of the place name, add the
+  state (county names repeat across states), or try a broader area such as the state or the whole country.
 - Do not show SQL or column names unless the user asks for them.
 - The data covers the US states, DC and Puerto Rico, at block-group level aggregated to county, state or country.
   Say so when the user asks about something outside the data."""
+
+
+def unanswered_parts(state: AgentState) -> list[str]:
+    """Parts of the question that table selection or SQL generation found uncovered, without duplicates."""
+    parts = (state.get("selection_unanswered") or []) + (state.get("sql_unanswered") or [])
+    return list(dict.fromkeys(part.strip() for part in parts if part.strip()))
 
 
 def format_result(result: dict) -> str:
@@ -58,10 +66,12 @@ def build_answer(llm: BaseChatModel):
         else:
             outcome = "No query was run."
 
+        unanswered = unanswered_parts(state)
         prompt = (
             f"Conversation so far:\n{format_context(history)}\n\n"
             f"Question: {latest.text}\n\n"
             f"Notes: {state.get('sql_notes') or 'none'}\n\n"
+            f"Not answered: {'; '.join(unanswered) or 'none'}\n\n"
             f"{outcome}"
         )
         try:
@@ -75,6 +85,8 @@ def build_answer(llm: BaseChatModel):
             text = f"Here is the result:\n{format_result(result)}" if result and result["rows"] else FALLBACK_NO_DATA
             if error and not result:
                 text = FALLBACK_ERROR
+            elif unanswered:
+                text += f"\n\nI could not cover: {'; '.join(unanswered)}."
         return {"messages": [AIMessage(text)]}
 
     return answer

@@ -22,6 +22,7 @@ graph TD;
 	answer(answer)
 	no_table(no_table)
 	no_sql(no_sql)
+	failed_query(failed_query)
 	unavailable(unavailable)
 	clarify(clarify)
 	meta(meta)
@@ -29,9 +30,11 @@ graph TD;
 	__end__([<p>__end__</p>]):::last
 	__start__ --> intent;
 	execute_sql -.-> answer;
-	execute_sql -.-> no_sql;
+	execute_sql -.-> failed_query;
+	execute_sql -.-> unavailable;
 	execute_sql -.-> repair_sql;
 	generate_sql -.-> no_sql;
+	generate_sql -.-> unavailable;
 	generate_sql -.-> validate_sql;
 	intent -.-> clarify;
 	intent -.-> meta;
@@ -40,6 +43,7 @@ graph TD;
 	load_columns -.-> generate_sql;
 	load_columns -.-> unavailable;
 	repair_sql -.-> no_sql;
+	repair_sql -.-> unavailable;
 	repair_sql -.-> validate_sql;
 	rewrite --> search;
 	search -.-> select_tables;
@@ -47,10 +51,11 @@ graph TD;
 	select_tables -.-> load_columns;
 	select_tables -.-> no_table;
 	validate_sql -.-> execute_sql;
-	validate_sql -.-> no_sql;
+	validate_sql -.-> failed_query;
 	validate_sql -.-> repair_sql;
 	answer --> __end__;
 	clarify --> __end__;
+	failed_query --> __end__;
 	meta --> __end__;
 	no_sql --> __end__;
 	no_table --> __end__;

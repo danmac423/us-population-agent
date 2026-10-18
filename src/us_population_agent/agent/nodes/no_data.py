@@ -12,7 +12,11 @@ FALLBACK_NO_DATA = (
     "I couldn't answer that from the census data I have. Could you rephrase the question, "
     "or ask about a different measure (for example population, income, housing or poverty) or place?"
 )
-UNAVAILABLE = "I couldn't reach the census data just now. Please try again in a moment."
+UNAVAILABLE = "Something went wrong while looking up the data. Please try again in a moment."
+FAILED_QUERY = (
+    "I couldn't build a reliable query for that question. "
+    "Could you rephrase it, or ask about a narrower measure or place?"
+)
 
 NO_DATA_SYSTEM_PROMPT = f"""# ROLE
 You are a US Census data assistant. The user's question is reasonable but cannot be answered from the data you
@@ -44,5 +48,10 @@ def build_no_data(llm: BaseChatModel, *, name: str, hint: Callable[[AgentState],
 
 
 def unavailable(state: AgentState) -> dict:
-    """Technical failure (catalog or metadata unreachable): a fixed message, no model call."""
+    """Technical failure (catalog, metadata, Snowflake or the model unavailable): a fixed message, no model call."""
     return {"messages": [AIMessage(UNAVAILABLE)]}
+
+
+def failed_query(state: AgentState) -> dict:
+    """The generated query kept failing after repairs. This is not "no data", so a fixed message, no model call."""
+    return {"messages": [AIMessage(FAILED_QUERY)]}
