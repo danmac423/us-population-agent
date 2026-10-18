@@ -137,7 +137,7 @@ def state_update(decision: IntentDecision) -> dict:
 
 def build_run_intent(llm: BaseChatModel):
     """Create the intent node. The classifier sees the recent context and the latest user message."""
-    classifier = llm.with_structured_output(IntentDecision)
+    classifier = llm.with_structured_output(IntentDecision, method="json_schema")
 
     def run_intent(state: AgentState) -> dict:
         *history, latest = state["messages"]

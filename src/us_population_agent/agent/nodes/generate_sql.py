@@ -55,7 +55,7 @@ Use ONLY the listed columns. Never invent column or table names.
 - Never answer from your own knowledge. Without a matching column, sql must be null.
 
 # STEP 2 - GEOGRAPHY AND GRANULARITY
-- No location: whole country, no geographic grouping.
+- No location: whole country, no geographic grouping. "The country" means the 50 states and DC only.
 - States: WHERE v.STATE_ABBR IN (...), GROUP BY v.STATE_ABBR.
 - Counties: match COUNTY_NAME with ILIKE (see COUNTY NAMES below) [+ v.STATE_ABBR = ... if the state is known],
   GROUP BY v.STATE_ABBR, v.COUNTY_NAME. ALWAYS group by state too, county names repeat (Baldwin County is in
@@ -63,8 +63,10 @@ Use ONLY the listed columns. Never invent column or table names.
 - "In each state" or a state ranking: GROUP BY v.STATE_ABBR, ORDER BY, LIMIT.
 - Several levels at once (e.g. Texas compared to the country): UNION ALL of separate SELECTs with GEO_LEVEL
   ('USA' / 'STATE' / 'COUNTY') and GEO (name) columns.
-Convert state names to abbreviations (Texas -> 'TX'). "Whole country" includes PR; for "US states" or
-"the 50 states" add v.STATE_ABBR <> 'PR'.
+Convert state names to abbreviations (Texas -> 'TX').
+Puerto Rico ('PR') is a territory, not a state. Unless the question names Puerto Rico, always add
+v.STATE_ABBR <> 'PR' to queries over the whole country, over all states and to state rankings or comparisons
+with the country.
 
 COUNTY NAMES
 COUNTY_NAME always ends with a type word that the user usually leaves out: County, Parish (Louisiana),
@@ -123,6 +125,7 @@ SQL:
 SELECT 'USA' AS GEO_LEVEL, 'USA' AS GEO, SUM(d."B01001e1") AS TOTAL_POPULATION, COUNT(*) AS N_CBG
 FROM {census_schema}."2020_CBG_B01" d
 JOIN {geography} v USING (CENSUS_BLOCK_GROUP)
+WHERE v.STATE_ABBR <> 'PR'
 UNION ALL
 SELECT 'STATE', v.STATE_ABBR, SUM(d."B01001e1"), COUNT(*)
 FROM {census_schema}."2020_CBG_B01" d
@@ -196,7 +199,7 @@ def run_generator(generator, system_prompt: str, prompt: str, columns: list[dict
 
 def build_generate_sql(llm: BaseChatModel, settings: Settings):
     """Create the node that selects columns and writes the SQL for the chosen table."""
-    generator = llm.with_structured_output(SqlGeneration)
+    generator = llm.with_structured_output(SqlGeneration, method="json_schema")
     system_prompt = build_system_prompt(settings)
 
     def generate_sql(state: AgentState) -> dict:

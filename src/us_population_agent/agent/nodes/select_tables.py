@@ -50,7 +50,7 @@ def format_candidates(candidates: list[dict]) -> str:
 
 def build_select_tables(llm: BaseChatModel):
     """Create the node that picks the best table among the search candidates."""
-    selector = llm.with_structured_output(TableSelection)
+    selector = llm.with_structured_output(TableSelection, method="json_schema")
 
     def select_tables(state: AgentState) -> dict:
         candidates = state.get("candidates") or []

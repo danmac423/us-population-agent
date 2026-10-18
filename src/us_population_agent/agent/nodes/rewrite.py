@@ -91,7 +91,7 @@ queries: (none)"""
 
 def build_rewrite(llm: BaseChatModel, max_queries: int):
     """Create the rewrite node: turns the conversation and the latest question into catalog search queries."""
-    rewriter = llm.with_structured_output(QueryRewrite)
+    rewriter = llm.with_structured_output(QueryRewrite, method="json_schema")
     system_prompt = REWRITE_SYSTEM_PROMPT.format(max_queries=max_queries)
 
     def rewrite(state: AgentState) -> dict:

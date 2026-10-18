@@ -25,7 +25,7 @@ class FakeStructuredLLM:
         self.outcome = outcome
         self.calls: list[list] = []
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **kwargs):
         return self
 
     def invoke(self, messages):

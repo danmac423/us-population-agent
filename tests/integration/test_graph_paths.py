@@ -65,7 +65,7 @@ class ScriptedLLM:
         self.scripts = {schema: list(v) if isinstance(v, list) else [v] for schema, v in structured.items()}
         self.text = text
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **kwargs):
         script = self.scripts[schema]
 
         class Structured:

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def build_repair_sql(llm: BaseChatModel, settings: Settings):
     """Create the node that rewrites SQL which failed validation or execution, given the problems found."""
-    generator = llm.with_structured_output(SqlGeneration)
+    generator = llm.with_structured_output(SqlGeneration, method="json_schema")
     system_prompt = build_system_prompt(settings)
 
     def repair_sql(state: AgentState) -> dict:
