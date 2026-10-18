@@ -7,15 +7,11 @@ import psycopg
 from langchain_core.messages import HumanMessage
 from pydantic import ValidationError
 
-from us_population_agent.agent.graph import build_graph
+from us_population_agent.agent.runtime import open_graph
 from us_population_agent.config import Settings, get_settings
-from us_population_agent.llm.factory import LLMInitError, build_llm
+from us_population_agent.llm.factory import LLMInitError
 from us_population_agent.logging_config import setup_logging
-from us_population_agent.persistence.checkpointer import open_checkpointer
-from us_population_agent.snowflake_client.columns import ColumnCatalog
-from us_population_agent.snowflake_client.connection import SnowflakeInitError, open_connection
-from us_population_agent.snowflake_client.query import QueryRunner
-from us_population_agent.snowflake_client.search import CatalogSearch
+from us_population_agent.snowflake_client.connection import SnowflakeInitError
 
 logger = logging.getLogger(__name__)
 
@@ -36,16 +32,8 @@ def main() -> None:
     setup_logging(settings.log_level)
 
     try:
-        llm = build_llm(model_name=settings.anthropic_model_name, effort="low")
-        sql_llm = build_llm(model_name=settings.anthropic_strong_model_name, effort="low")
-    except LLMInitError as exc:
-        logger.error("Startup error: %s", exc)
-        raise SystemExit(1) from exc
-    logger.info("LLM ready")
-
-    try:
-        asyncio.run(chat(settings, llm, sql_llm, args.thread or settings.default_thread_id))
-    except SnowflakeInitError as exc:
+        asyncio.run(chat(settings, args.thread or settings.default_thread_id))
+    except (LLMInitError, SnowflakeInitError) as exc:
         logger.error("Startup error: %s", exc)
         raise SystemExit(1) from exc
     except psycopg.OperationalError as exc:
@@ -53,14 +41,9 @@ def main() -> None:
         raise SystemExit(1) from exc
 
 
-async def chat(settings: Settings, llm, sql_llm, thread_id: str) -> None:
-    with open_connection(settings) as connection:
-        async with open_checkpointer(settings.database_url) as checkpointer:
-            catalog = CatalogSearch(connection, settings)
-            columns = ColumnCatalog(connection, settings)
-            runner = QueryRunner(connection, settings)
-            graph = build_graph(llm, catalog, columns, runner, sql_llm, settings, checkpointer)
-            await run_chat(graph, thread_id)
+async def chat(settings: Settings, thread_id: str) -> None:
+    async with open_graph(settings) as graph:
+        await run_chat(graph, thread_id)
 
 
 async def run_chat(graph, thread_id: str) -> None:

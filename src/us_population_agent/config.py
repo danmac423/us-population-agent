@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     log_level: str = "WARNING"
     default_thread_id: str = "demo"  # conversation used when --thread is not given
 
+    # Web API.
+    api_key: SecretStr | None = None  # when set, /chat requires it in the X-API-Key header
+    turn_timeout_seconds: int = Field(default=120, ge=1)  # one whole question, including query repairs
+    max_message_chars: int = Field(default=1000, ge=1)
+
     # Agent limits.
     max_repairs: int = Field(default=2, ge=0)  # how many times a failing query is rewritten before giving up
     max_search_queries: int = Field(default=4, ge=1)  # catalog search queries per question

@@ -1,4 +1,4 @@
-.PHONY: install fmt lint typecheck test test-unit test-integration check run clean
+.PHONY: install fmt lint typecheck test test-unit test-integration check api run clean
 
 install:
 	uv sync
@@ -25,6 +25,9 @@ test-integration:
 	uv run pytest tests/integration
 
 check: lint typecheck test
+
+api:
+	uv run uvicorn --factory us_population_agent.api:create_app --reload
 
 run:
 	uv run us_population_agent
