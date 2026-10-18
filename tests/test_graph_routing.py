@@ -8,6 +8,10 @@ from us_population_agent.agent.graph import (
     no_table_hint,
     route_after_execute_sql,
     route_after_generate_sql,
+    route_after_intent,
+    route_after_load_columns,
+    route_after_search,
+    route_after_select_tables,
     route_after_validate_sql,
 )
 from us_population_agent.agent.nodes.answer import unanswered_parts
@@ -66,3 +70,43 @@ def test_hints_carry_the_reasons_to_the_reply():
     assert no_sql_hint(state(sql_notes="Missing column.", sql_unanswered=["income by race"])) == (
         "Missing column. Not covered: income by race."
     )
+
+
+@pytest.mark.parametrize(
+    ("intent", "expected"),
+    [
+        ("answerable", "rewrite"),
+        ("needs_clarification", "clarify"),
+        ("meta", "meta"),
+        ("off_topic", "off_topic"),
+        ("something_else", "clarify"),
+        (None, "clarify"),
+    ],
+)
+def test_intent_routes_to_its_node_and_unknown_goes_to_clarify(intent, expected):
+    assert route_after_intent(state(intent=intent)) == expected
+    assert route_after_intent(state()) == "clarify"
+
+
+def test_search_outage_stops_with_a_technical_message():
+    assert route_after_search(state(search_failed=True)) == "unavailable"
+    assert route_after_search(state(search_failed=False)) == "select_tables"
+    assert route_after_search(state()) == "select_tables"
+
+
+def test_no_selected_table_goes_to_no_table():
+    assert route_after_select_tables(state(selected_table_id="B01001")) == "load_columns"
+    assert route_after_select_tables(state(selected_table_id=None)) == "no_table"
+    assert route_after_select_tables(state()) == "no_table"
+
+
+def test_missing_columns_are_a_technical_failure():
+    assert route_after_load_columns(state(table_columns=[{"name": "a", "meaning": "A"}])) == "generate_sql"
+    assert route_after_load_columns(state(table_columns=[])) == "unavailable"
+    assert route_after_load_columns(state()) == "unavailable"
+
+
+def test_no_sql_hint_without_notes_uses_only_the_uncovered_parts():
+    assert no_sql_hint(state(sql_unanswered=["income"])) == "Not covered: income."
+    assert no_sql_hint(state(sql_notes="Missing column.")) == "Missing column."
+    assert no_sql_hint(state()) is None
