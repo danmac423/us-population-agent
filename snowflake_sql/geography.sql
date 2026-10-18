@@ -1,0 +1,355 @@
+-- WITH geo AS (
+--     -- County -> FIPS codes (county names repeat across states, so filter by STATE too)
+--     SELECT CENSUS_BLOCK_GROUP, STATE_ABBR, COUNTY_NAME
+--     FROM CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY
+--     WHERE COUNTY_NAME = 'Autauga County'
+--       AND STATE_ABBR  = 'AL'
+-- ),
+-- SELECT 
+----
+SELECT *
+FROM CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY
+WHERE 
+    -- COUNTY_NAME = 'New York'
+      STATE_ABBR  = 'NY';
+
+-- 1) Inputs
+SET (TBL_ID, COUNTY, STATE) = ('B29003', 'Autauga County', 'AL');
+SET COLUMN_NAMES = 'B29003e1,B29003e2';
+
+-- 2) CLEAN_METADATA tells us which data table holds this TABLE_ID (e.g. 2020_CBG_B01)
+SET DATA_TBL = (
+    SELECT 'US_OPEN_CENSUS_DATA_NEIGHBORHOOD_INSIGHTS_FREE_DATASET.PUBLIC."' || ANY_VALUE(DATA_TABLE_NAME) || '"'
+    FROM CENSUS_APP_DB.PUBLIC.CLEAN_METADATA
+    WHERE TABLE_ID = $TBL_ID
+);
+
+-- 3) Values per block group, with descriptions
+WITH geo AS (
+    -- V_GEOGRAPHY = source of truth: which block groups belong to the county
+    SELECT CENSUS_BLOCK_GROUP, STATE_ABBR, COUNTY_NAME
+    FROM CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY
+    WHERE COUNTY_NAME = $COUNTY AND STATE_ABBR = $STATE
+),
+cbg AS (
+    -- Only those block groups from the data table found in step 2
+    SELECT d.CENSUS_BLOCK_GROUP, OBJECT_CONSTRUCT(d.*) AS ROW_OBJ
+    FROM IDENTIFIER($DATA_TBL) d
+    JOIN geo g ON g.CENSUS_BLOCK_GROUP = d.CENSUS_BLOCK_GROUP
+),
+cbg_values AS (
+    -- Unpivot wide columns (B01001e1, B01001e2, ...) into rows
+    SELECT c.CENSUS_BLOCK_GROUP, f.KEY AS COLUMN_NAME, f.VALUE::NUMBER AS VAL
+    FROM cbg c, LATERAL FLATTEN(c.ROW_OBJ) f
+)
+SELECT g.STATE_ABBR, g.COUNTY_NAME, v.CENSUS_BLOCK_GROUP,
+       m.COLUMN_NAME, m.COLUMN_DESCRIPTION, v.VAL
+FROM cbg_values v
+JOIN geo g ON g.CENSUS_BLOCK_GROUP = v.CENSUS_BLOCK_GROUP
+JOIN CENSUS_APP_DB.PUBLIC.CLEAN_METADATA m ON m.COLUMN_NAME = v.COLUMN_NAME
+WHERE m.TABLE_ID = $TBL_ID          -- 2020_CBG_B01 also has B01002, B01003...; keep only B01001
+      AND ARRAY_CONTAINS(m.COLUMN_NAME::VARIANT, SPLIT($COLUMN_NAMES, ','))
+ORDER BY v.CENSUS_BLOCK_GROUP,
+         TRY_TO_NUMBER(REGEXP_SUBSTR(m.COLUMN_NAME, 'e([0-9]+)$', 1, 1, 'e', 1));
+
+
+-------
+
+
+WITH geo AS (
+    -- V_GEOGRAPHY = source of truth: which block groups belong to the county
+    SELECT CENSUS_BLOCK_GROUP, STATE_ABBR, COUNTY_NAME
+    FROM CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY
+    WHERE COUNTY_NAME = $COUNTY AND STATE_ABBR = $STATE
+),
+cbg AS (
+    -- Only those block groups from the data table found in step 2
+    SELECT d.CENSUS_BLOCK_GROUP, OBJECT_CONSTRUCT(d.*) AS ROW_OBJ
+    FROM IDENTIFIER($DATA_TBL) d
+    JOIN geo g ON g.CENSUS_BLOCK_GROUP = d.CENSUS_BLOCK_GROUP
+),
+cbg_values AS (
+    -- Unpivot wide columns (B01001e1, B01001e2, ...) into rows
+    SELECT c.CENSUS_BLOCK_GROUP, f.KEY AS COLUMN_NAME, f.VALUE::NUMBER AS VAL
+    FROM cbg c, LATERAL FLATTEN(c.ROW_OBJ) f
+)
+SELECT g.STATE_ABBR, g.COUNTY_NAME,
+       m.COLUMN_NAME, m.COLUMN_DESCRIPTION,
+       SUM(v.VAL)                        AS TOTAL_VAL,      -- suma po wszystkich CBG w hrabstwie
+       COUNT(DISTINCT v.CENSUS_BLOCK_GROUP) AS N_CBG        -- z ilu block groups
+FROM cbg_values v
+JOIN geo g ON g.CENSUS_BLOCK_GROUP = v.CENSUS_BLOCK_GROUP
+JOIN CENSUS_APP_DB.PUBLIC.CLEAN_METADATA m ON m.COLUMN_NAME = v.COLUMN_NAME
+WHERE m.TABLE_ID = $TBL_ID
+  AND ARRAY_CONTAINS(m.COLUMN_NAME::VARIANT, SPLIT($COLUMN_NAMES, ','))
+GROUP BY ALL
+ORDER BY TRY_TO_NUMBER(REGEXP_SUBSTR(m.COLUMN_NAME, 'e([0-9]+)$', 1, 1, 'e', 1));
+
+
+-- ==============================================
+-- ============= COUNTY AND STATE =============
+
+-- 1) Inputs
+SET TBL_ID       = 'B29003';
+SET COLUMN_NAMES = 'B29003e1,B29003e2';
+SET COUNTIES     = 'Autauga County|AL,New York County|NY';   -- Name|STATE, comma-separated, no spaces after commas
+
+-- 2) Data table for this TABLE_ID
+SET DATA_TBL = (
+    SELECT 'US_OPEN_CENSUS_DATA_NEIGHBORHOOD_INSIGHTS_FREE_DATASET.PUBLIC."' || ANY_VALUE(DATA_TABLE_NAME) || '"'
+    FROM CENSUS_APP_DB.PUBLIC.CLEAN_METADATA
+    WHERE TABLE_ID = $TBL_ID
+);
+
+-- 3) Totals per county and column
+WITH geo AS (
+    SELECT CENSUS_BLOCK_GROUP, STATE_ABBR, COUNTY_NAME
+    FROM CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY
+    WHERE ARRAY_CONTAINS((COUNTY_NAME || '|' || STATE_ABBR)::VARIANT, SPLIT($COUNTIES, ','))
+),
+cbg AS (
+    SELECT d.CENSUS_BLOCK_GROUP, OBJECT_CONSTRUCT(d.*) AS ROW_OBJ
+    FROM IDENTIFIER($DATA_TBL) d
+    JOIN geo g ON g.CENSUS_BLOCK_GROUP = d.CENSUS_BLOCK_GROUP
+),
+cbg_values AS (
+    SELECT c.CENSUS_BLOCK_GROUP, f.KEY AS COLUMN_NAME, f.VALUE::NUMBER AS VAL
+    FROM cbg c, LATERAL FLATTEN(c.ROW_OBJ) f
+)
+SELECT g.STATE_ABBR, g.COUNTY_NAME,
+       m.COLUMN_NAME, m.COLUMN_DESCRIPTION,
+       SUM(v.VAL)                           AS TOTAL_VAL,
+       COUNT(DISTINCT v.CENSUS_BLOCK_GROUP) AS N_CBG
+FROM cbg_values v
+JOIN geo g ON g.CENSUS_BLOCK_GROUP = v.CENSUS_BLOCK_GROUP
+JOIN CENSUS_APP_DB.PUBLIC.CLEAN_METADATA m ON m.COLUMN_NAME = v.COLUMN_NAME
+WHERE m.TABLE_ID = $TBL_ID
+  AND ARRAY_CONTAINS(m.COLUMN_NAME::VARIANT, SPLIT($COLUMN_NAMES, ','))
+GROUP BY ALL
+ORDER BY g.STATE_ABBR, g.COUNTY_NAME,
+         TRY_TO_NUMBER(REGEXP_SUBSTR(m.COLUMN_NAME, 'e([0-9]+)$', 1, 1, 'e', 1));
+
+-- ==============================================
+-- ============= COUNTY ONLY =============
+
+-- 1) Inputs
+SET TBL_ID       = 'B29003';
+SET COLUMN_NAMES = 'B29003e1,B29003e2';
+SET COUNTIES     = 'Autauga County,Baldwin County';
+
+-- 2) Data table for this TABLE_ID
+SET DATA_TBL = (
+    SELECT 'US_OPEN_CENSUS_DATA_NEIGHBORHOOD_INSIGHTS_FREE_DATASET.PUBLIC."' || ANY_VALUE(DATA_TABLE_NAME) || '"'
+    FROM CENSUS_APP_DB.PUBLIC.CLEAN_METADATA
+    WHERE TABLE_ID = $TBL_ID
+);
+
+-- 3) Totals per county and column
+WITH geo AS (
+    SELECT CENSUS_BLOCK_GROUP, STATE_ABBR, COUNTY_NAME
+    FROM CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY
+    WHERE ARRAY_CONTAINS(COUNTY_NAME::VARIANT, SPLIT($COUNTIES, ','))
+),
+cbg AS (
+    SELECT d.CENSUS_BLOCK_GROUP, OBJECT_CONSTRUCT(d.*) AS ROW_OBJ
+    FROM IDENTIFIER($DATA_TBL) d
+    JOIN geo g ON g.CENSUS_BLOCK_GROUP = d.CENSUS_BLOCK_GROUP
+),
+cbg_values AS (
+    SELECT c.CENSUS_BLOCK_GROUP, f.KEY AS COLUMN_NAME, f.VALUE::NUMBER AS VAL
+    FROM cbg c, LATERAL FLATTEN(c.ROW_OBJ) f
+)
+SELECT g.STATE_ABBR, g.COUNTY_NAME,
+       m.COLUMN_NAME, m.COLUMN_DESCRIPTION,
+       SUM(v.VAL)                           AS TOTAL_VAL,
+       COUNT(DISTINCT v.CENSUS_BLOCK_GROUP) AS N_CBG
+FROM cbg_values v
+JOIN geo g ON g.CENSUS_BLOCK_GROUP = v.CENSUS_BLOCK_GROUP
+JOIN CENSUS_APP_DB.PUBLIC.CLEAN_METADATA m ON m.COLUMN_NAME = v.COLUMN_NAME
+WHERE m.TABLE_ID = $TBL_ID
+  AND ARRAY_CONTAINS(m.COLUMN_NAME::VARIANT, SPLIT($COLUMN_NAMES, ','))
+GROUP BY ALL
+ORDER BY g.STATE_ABBR, g.COUNTY_NAME,
+         TRY_TO_NUMBER(REGEXP_SUBSTR(m.COLUMN_NAME, 'e([0-9]+)$', 1, 1, 'e', 1));
+
+-- ==============================================
+-- ============= STATE ONLY =============
+-- 1) Inputs
+SET COLUMN_NAMES = 'B29003e1,B29003e2';
+SET STATES       = 'AL,NY';            -- one or more, e.g. 'AL,TX' (no spaces after commas)
+
+-- 2) Data table derived from the columns (via CLEAN_METADATA)
+SET DATA_TBL = (
+    SELECT 'US_OPEN_CENSUS_DATA_NEIGHBORHOOD_INSIGHTS_FREE_DATASET.PUBLIC."' || ANY_VALUE(DATA_TABLE_NAME) || '"'
+    FROM CENSUS_APP_DB.PUBLIC.CLEAN_METADATA
+    WHERE ARRAY_CONTAINS(COLUMN_NAME::VARIANT, SPLIT($COLUMN_NAMES, ','))
+);
+
+-- 3) Totals per state and column
+WITH geo AS (
+    SELECT CENSUS_BLOCK_GROUP, STATE_ABBR
+    FROM CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY
+    WHERE ARRAY_CONTAINS(STATE_ABBR::VARIANT, SPLIT($STATES, ','))
+),
+cbg AS (
+    SELECT d.CENSUS_BLOCK_GROUP, OBJECT_CONSTRUCT(d.*) AS ROW_OBJ
+    FROM IDENTIFIER($DATA_TBL) d
+    JOIN geo g ON g.CENSUS_BLOCK_GROUP = d.CENSUS_BLOCK_GROUP
+),
+cbg_values AS (
+    SELECT c.CENSUS_BLOCK_GROUP, f.KEY AS COLUMN_NAME, f.VALUE::NUMBER AS VAL
+    FROM cbg c, LATERAL FLATTEN(c.ROW_OBJ) f
+    WHERE ARRAY_CONTAINS(f.KEY::VARIANT, SPLIT($COLUMN_NAMES, ','))
+)
+SELECT g.STATE_ABBR,
+       m.COLUMN_NAME, m.COLUMN_DESCRIPTION,
+       SUM(v.VAL)                           AS TOTAL_VAL,
+       COUNT(DISTINCT v.CENSUS_BLOCK_GROUP) AS N_CBG
+FROM cbg_values v
+JOIN geo g                                 ON g.CENSUS_BLOCK_GROUP = v.CENSUS_BLOCK_GROUP
+JOIN CENSUS_APP_DB.PUBLIC.CLEAN_METADATA m ON m.COLUMN_NAME        = v.COLUMN_NAME
+GROUP BY ALL
+ORDER BY g.STATE_ABBR,
+         TRY_TO_NUMBER(REGEXP_SUBSTR(m.COLUMN_NAME, 'e([0-9]+)$', 1, 1, 'e', 1));
+
+
+
+
+-- ==============================================
+-- ============= NO GEOGRAPHY =============
+
+-- 1) Input: only column names
+SET COLUMN_NAMES = 'B29003e1,B29003e2';
+
+-- 2) Data table derived from the columns (via CLEAN_METADATA)
+SET DATA_TBL = (
+    SELECT 'US_OPEN_CENSUS_DATA_NEIGHBORHOOD_INSIGHTS_FREE_DATASET.PUBLIC."' || ANY_VALUE(DATA_TABLE_NAME) || '"'
+    FROM CENSUS_APP_DB.PUBLIC.CLEAN_METADATA
+    WHERE ARRAY_CONTAINS(COLUMN_NAME::VARIANT, SPLIT($COLUMN_NAMES, ','))
+);
+
+-- 3) Totals per column, whole dataset
+WITH cbg AS (
+    SELECT d.CENSUS_BLOCK_GROUP, OBJECT_CONSTRUCT(d.*) AS ROW_OBJ
+    FROM IDENTIFIER($DATA_TBL) d
+),
+cbg_values AS (
+    -- Unpivot, keeping only the requested columns
+    SELECT c.CENSUS_BLOCK_GROUP, f.KEY AS COLUMN_NAME, f.VALUE::NUMBER AS VAL
+    FROM cbg c, LATERAL FLATTEN(c.ROW_OBJ) f
+    WHERE ARRAY_CONTAINS(f.KEY::VARIANT, SPLIT($COLUMN_NAMES, ','))
+)
+SELECT m.COLUMN_NAME, m.COLUMN_DESCRIPTION,
+       SUM(v.VAL)                           AS TOTAL_VAL,
+       COUNT(DISTINCT v.CENSUS_BLOCK_GROUP) AS N_CBG
+FROM cbg_values v
+JOIN CENSUS_APP_DB.PUBLIC.CLEAN_METADATA m ON m.COLUMN_NAME = v.COLUMN_NAME
+GROUP BY ALL
+ORDER BY TRY_TO_NUMBER(REGEXP_SUBSTR(m.COLUMN_NAME, 'e([0-9]+)$', 1, 1, 'e', 1));
+
+
+-- ==============================================
+-- ==============================================
+
+-- 1) Inputs ('' = not given)
+SET COLUMN_NAMES = 'B01001e3,B01001e4,B01001e5,B01001e6';
+SET STATES       = 'TX';                                  -- e.g. 'AL,TX'
+-- SET COUNTIES     = 'Autauga County,Baldwin County';     -- e.g. 'Autauga County'
+SET COUNTIES     = '';     -- e.g. 'Autauga County'
+
+
+-- 2) Data table derived from the columns (via CLEAN_METADATA)
+SET DATA_TBL = (
+    SELECT 'US_OPEN_CENSUS_DATA_NEIGHBORHOOD_INSIGHTS_FREE_DATASET.PUBLIC."' || ANY_VALUE(DATA_TABLE_NAME) || '"'
+    FROM CENSUS_APP_DB.PUBLIC.CLEAN_METADATA
+    WHERE ARRAY_CONTAINS(COLUMN_NAME::VARIANT, SPLIT($COLUMN_NAMES, ','))
+);
+
+-- 3) Totals per column; given geography levels become grouping levels
+WITH geo AS (
+    SELECT CENSUS_BLOCK_GROUP,
+        -- Level not given -> NULL, so it doesn't split the totals
+        -- show state also when a county is given
+        IFF($STATES = '' AND $COUNTIES = '', NULL, STATE_ABBR) AS STATE_ABBR,
+        IFF($COUNTIES = '', NULL, COUNTY_NAME) AS COUNTY_NAME
+    FROM CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY
+    -- Level not given -> no filter on it
+    WHERE ($STATES   = '' OR ARRAY_CONTAINS(STATE_ABBR::VARIANT,  SPLIT($STATES, ',')))
+      AND ($COUNTIES = '' OR ARRAY_CONTAINS(COUNTY_NAME::VARIANT, SPLIT($COUNTIES, ',')))
+),
+cbg AS (
+    SELECT d.CENSUS_BLOCK_GROUP, OBJECT_CONSTRUCT(d.*) AS ROW_OBJ
+    FROM IDENTIFIER($DATA_TBL) d
+    JOIN geo g ON g.CENSUS_BLOCK_GROUP = d.CENSUS_BLOCK_GROUP
+),
+cbg_values AS (
+    -- Unpivot, keeping only the requested columns
+    SELECT c.CENSUS_BLOCK_GROUP, f.KEY AS COLUMN_NAME, f.VALUE::NUMBER AS VAL
+    FROM cbg c, LATERAL FLATTEN(c.ROW_OBJ) f
+    WHERE ARRAY_CONTAINS(f.KEY::VARIANT, SPLIT($COLUMN_NAMES, ','))
+)
+SELECT g.STATE_ABBR, g.COUNTY_NAME,
+       m.COLUMN_NAME, m.COLUMN_DESCRIPTION,
+       SUM(v.VAL)                           AS TOTAL_VAL,
+       COUNT(DISTINCT v.CENSUS_BLOCK_GROUP) AS N_CBG
+FROM cbg_values v
+JOIN geo g                                 ON g.CENSUS_BLOCK_GROUP = v.CENSUS_BLOCK_GROUP
+JOIN CENSUS_APP_DB.PUBLIC.CLEAN_METADATA m ON m.COLUMN_NAME        = v.COLUMN_NAME
+GROUP BY ALL
+ORDER BY g.STATE_ABBR, g.COUNTY_NAME,
+         TRY_TO_NUMBER(REGEXP_SUBSTR(m.COLUMN_NAME, 'e([0-9]+)$', 1, 1, 'e', 1)); 
+
+
+-- ==============================================
+-- ==============================================
+
+-- 1) Inputs
+SET COLUMN_NAMES = 'B01003e2';
+
+-- 2) Data table derived from the columns (via CLEAN_METADATA)
+SET DATA_TBL = (
+    SELECT 'US_OPEN_CENSUS_DATA_NEIGHBORHOOD_INSIGHTS_FREE_DATASET.PUBLIC."' || ANY_VALUE(DATA_TABLE_NAME) || '"'
+    FROM CENSUS_APP_DB.PUBLIC.CLEAN_METADATA
+    WHERE ARRAY_CONTAINS(COLUMN_NAME::VARIANT, SPLIT($COLUMN_NAMES, ','))
+);
+
+-- 3) Base + any set of aggregations
+WITH cbg AS (
+    SELECT d.CENSUS_BLOCK_GROUP, OBJECT_CONSTRUCT(d.*) AS ROW_OBJ
+    FROM IDENTIFIER($DATA_TBL) d
+),
+cbg_values AS (
+    -- Unpivot, keeping only the requested columns
+    SELECT c.CENSUS_BLOCK_GROUP, f.KEY AS COLUMN_NAME, f.VALUE::NUMBER AS VAL
+    FROM cbg c, LATERAL FLATTEN(c.ROW_OBJ) f
+    WHERE ARRAY_CONTAINS(f.KEY::VARIANT, SPLIT($COLUMN_NAMES, ','))
+),
+base AS (
+    -- BASE: one row per block group x column, with geography attached; no geo filters here
+    SELECT g.STATE_ABBR, g.COUNTY_NAME, v.CENSUS_BLOCK_GROUP, v.COLUMN_NAME, v.VAL
+    FROM cbg_values v
+    JOIN CENSUS_APP_DB.PUBLIC.V_GEOGRAPHY g ON g.CENSUS_BLOCK_GROUP = v.CENSUS_BLOCK_GROUP
+),
+results AS (
+    -- Whole country
+    SELECT 'USA' AS GEO_LEVEL, 'USA' AS GEO, COLUMN_NAME,
+           SUM(VAL) AS TOTAL_VAL, COUNT(DISTINCT CENSUS_BLOCK_GROUP) AS N_CBG
+    FROM base GROUP BY ALL
+
+    UNION ALL
+    -- Texas
+    SELECT 'STATE', STATE_ABBR, COLUMN_NAME, SUM(VAL), COUNT(DISTINCT CENSUS_BLOCK_GROUP)
+    FROM base WHERE STATE_ABBR = 'TX' GROUP BY ALL
+
+    -- Add more blocks as needed, e.g.:
+    -- UNION ALL
+    -- SELECT 'COUNTY', COUNTY_NAME || ', ' || STATE_ABBR, COLUMN_NAME, SUM(VAL), COUNT(DISTINCT CENSUS_BLOCK_GROUP)
+    -- FROM base WHERE STATE_ABBR = 'AL' AND COUNTY_NAME = 'Autauga County' GROUP BY ALL
+)
+SELECT r.GEO_LEVEL, r.GEO, r.COLUMN_NAME, m.COLUMN_DESCRIPTION, r.TOTAL_VAL, r.N_CBG
+FROM results r
+JOIN CENSUS_APP_DB.PUBLIC.CLEAN_METADATA m ON m.COLUMN_NAME = r.COLUMN_NAME
+ORDER BY r.GEO_LEVEL DESC, r.GEO,
+         TRY_TO_NUMBER(REGEXP_SUBSTR(r.COLUMN_NAME, 'e([0-9]+)$', 1, 1, 'e', 1));
+
+
