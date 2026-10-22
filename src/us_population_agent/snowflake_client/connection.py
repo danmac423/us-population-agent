@@ -37,6 +37,7 @@ def open_connection(settings: Settings) -> Generator[SnowflakeConnection]:
             database=settings.snowflake_database,
             schema=settings.snowflake_schema,
             login_timeout=settings.login_timeout_seconds,
+            client_session_keep_alive=True,
             enable_server_session_keep_alive_auto_detection=False,
         )
     except snowflake.connector.Error as exc:

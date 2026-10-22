@@ -41,9 +41,6 @@ api:
 frontend:
 	uv run --group frontend streamlit run frontend/app.py
 
-run:
-	uv run us_population_agent
-
 clean:
 	find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache -o -name .mypy_cache \) -not -path "./.venv/*" -prune -exec rm -rf {} +
 	rm -rf .coverage coverage.xml htmlcov dist build *.egg-info
