@@ -2,14 +2,41 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Chat (debug)",
+      "name": "API (debug)",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/.venv/bin/us_population_agent",
-      "args": ["--thread", "debug2"],
-      "console": "integratedTerminal",
+      "module": "uvicorn",
+      "args": ["--factory", "us_population_agent.api:create_app", "--port", "8000"],
       "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
       "justMyCode": false
+    },
+    {
+      "name": "Frontend (Streamlit)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": ["run", "frontend/app.py"],
+      "env": { "API_URL": "http://localhost:8000" },
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Pytest: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-s"],
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ],
+  "compounds": [
+    {
+      "name": "API + Frontend",
+      "configurations": ["API (debug)", "Frontend (Streamlit)"],
+      "stopAll": true
     }
   ]
 }
