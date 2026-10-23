@@ -13,7 +13,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - run: uv sync --locked
+      - run: make sync
       - run: make lint
       - run: make typecheck
       - run: make test

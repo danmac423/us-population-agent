@@ -1,7 +1,10 @@
-.PHONY: install fmt lint typecheck test test-unit test-integration eval eval-generate eval-judge check api frontend run clean
+.PHONY: sync install fmt lint typecheck test test-unit test-integration eval eval-generate eval-judge check api frontend run clean
 
-install:
-	uv sync
+# dev + frontend: ty also checks frontend/, so Streamlit has to be installed. --locked fails on a stale uv.lock.
+sync:
+	uv sync --locked --group frontend
+
+install: sync
 	uv run pre-commit install
 
 fmt:

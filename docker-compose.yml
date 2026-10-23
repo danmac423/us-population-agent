@@ -17,7 +17,9 @@ services:
       retries: 10
 
   api:
-    build: .
+    build:
+      context: .
+      target: api
     restart: unless-stopped
     env_file: .env
     environment:
@@ -36,12 +38,13 @@ services:
       start_period: 20s
 
   frontend:
-    build: .
+    build:
+      context: .
+      target: frontend
     restart: unless-stopped
     # No env_file: the frontend does not need the API keys, only the address of the API.
     environment:
       API_URL: http://api:8000
-    command: ["streamlit", "run", "frontend/app.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
     ports:
       - "${FRONTEND_PORT:-8501}:8501"
     depends_on:
